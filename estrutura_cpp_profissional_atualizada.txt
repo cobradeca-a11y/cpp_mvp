@@ -138,7 +138,8 @@ A arquitetura atual do CPP é composta por:
 6. Motor de fusão MusicXML + OCR
 7. IA validadora
 8. Revisão humana
-9. Exportadores
+9. Navigation Engine
+10. Exportadores
 
 ------------------------------------------------------------
 4.1 FRONTEND CPP
@@ -369,6 +370,18 @@ Ações mínimas:
 - confirmar navegação
 - exportar
 
+------------------------------------------------------------
+4.9 NAVIGATION ENGINE
+------------------------------------------------------------
+
+Função:
+
+- gerar ordem de execução a partir do protocolo quando a navegação já estiver resolvida;
+- usar ordem visual/importada apenas como fallback declarado;
+- marcar status visual_only quando ainda não houver resolução de D.S., D.C., Coda, Fine ou repetições.
+
+O Navigation Engine não deve inventar uma ordem tocável definitiva quando a navegação estiver ambígua.
+
 ============================================================
 5. FLUXO OFICIAL DO CPP
 ============================================================
@@ -384,7 +397,7 @@ Ações mínimas:
 9. Validação por IA
 10. Revisão humana
 11. Geração da cifra técnica
-12. Geração da cifra tocável
+12. Geração da cifra tocável provisória ou final conforme fusion_status
 13. Exportação
 
 ============================================================
@@ -420,7 +433,7 @@ Estrutura base:
     "file_name": "",
     "file_type": "pdf|image|musicxml|mxl",
     "pages": 0,
-    "omr_status": "pending|success|failed|unavailable",
+    "omr_status": "pending|success|failed|unavailable|musicxml_parsed",
     "omr_engine": "Audiveris",
     "ocr_status": "pending|success|failed|unavailable",
     "ocr_engine": "",
@@ -497,6 +510,7 @@ OMR:
 - success
 - failed
 - unavailable
+- musicxml_parsed
 
 OCR:
 
@@ -555,7 +569,14 @@ Função:
 
 A cifra tocável também nasce do cpp_protocol.json.
 
-Formato visual:
+Estado atual:
+
+- saída provisória;
+- usa apenas relações já registradas no protocolo;
+- não tenta posicionar acordes por coordenada visual;
+- informa que o alinhamento profissional definitivo depende do motor de fusão MusicXML + OCR.
+
+Formato visual esperado no futuro:
 
 D              Bm
 Reveste, Senhor,
@@ -632,6 +653,7 @@ cpp_mvp/
       chord-sheet-technical.js
       chord-sheet-playable.js
       confidence-engine.js
+      navigation-engine.js
       export-output.js
 
 ============================================================
@@ -654,6 +676,11 @@ Concluído nesta fase:
 - CSS limpo para estrutura profissional
 - revisão humana reduzida a aprovação/incerteza
 - exportação preservada
+- cpp-json.js alinhado ao schema profissional
+- service-worker atualizado com dependências reais
+- feedback-engine ajustado para linguagem de evidências profissionais
+- chord-sheet-playable travado como saída provisória até fusion engine
+- backend normalizado para retornar protocolo profissional mesmo sem Audiveris
 
 Ainda pendente:
 
@@ -666,7 +693,7 @@ Ainda pendente:
 - criar motor de fusão MusicXML + OCR
 - criar IA validadora
 - testar com PDF real de louvor
-- ajustar geração de cifra tocável a partir de casos reais
+- ajustar geração de cifra tocável final a partir de casos reais
 
 ============================================================
 15. PRÓXIMO BLOCO DE TRABALHO
@@ -675,15 +702,14 @@ Ainda pendente:
 Próximo bloco recomendado:
 
 1. Verificar se o frontend sobe sem erro.
-2. Ajustar service-worker/cache após limpeza.
-3. Testar backend local.
-4. Testar /health.
-5. Testar upload de MusicXML direto.
-6. Testar PDF com Audiveris instalado.
-7. Evoluir parser MusicXML.
-8. Integrar OCR profissional.
-9. Criar fusion engine.
-10. Criar IA validadora estruturada.
+2. Testar backend local.
+3. Testar /health.
+4. Testar upload de MusicXML direto.
+5. Testar PDF com Audiveris instalado.
+6. Evoluir parser MusicXML.
+7. Integrar OCR profissional.
+8. Criar fusion engine.
+9. Criar IA validadora estruturada.
 
 ============================================================
 16. REGRA DE OURO ATUAL
