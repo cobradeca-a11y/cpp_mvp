@@ -1,0 +1,56 @@
+          <ul id="markersList" class="list compact"></ul>
+          <h3>Criar alinhamento</h3>
+          <div class="form-stack">
+            <label>Acorde <select id="alignChord"></select></label>
+            <label>Sílaba <select id="alignSyllable"></select></label>
+            <label>Nota <select id="alignNote"></select></label>
+            <label>Tipo <select id="alignType"><option>chord_on_syllable</option><option>chord_before_syllable</option><option>chord_between_syllables</option><option>chord_on_rest</option><option>chord_at_measure_start</option></select></label>
+            <label>Confiança <select id="alignConfidence"><option>certo</option><option>provável</option><option>incerto</option><option>ilegível</option></select></label>
+            <label><input id="simultaneousEvent" type="checkbox" /> Evento simultâneo</label>
+            <textarea id="alignObservation" placeholder="Observação"></textarea>
+            <button id="createAlignmentBtn" class="primary">Criar alinhamento</button>
+          </div>
+          <h3>Alinhamentos</h3>
+          <ul id="alignmentsList" class="list compact"></ul>
+        </aside>
+      </div>
+    </section>
+
+    <section id="screen-output" class="screen">
+      <div class="layout two">
+        <div class="card">
+          <h2>5. Saída</h2>
+          <div class="toolbar wrap">
+            <button id="generateOutputsBtn" class="primary">Gerar saídas</button>
+            <button id="exportJsonBtn">Exportar JSON</button>
+            <button id="exportTechnicalBtn">Exportar cifra técnica</button>
+            <button id="exportPlayableBtn">Exportar cifra tocável</button>
+            <button id="exportReportBtn">Exportar relatório</button>
+            <button id="exportAllBtn">Exportar pacote</button>
+          </div>
+          <div class="output-grid">
+            <div><h3>Cifra técnica</h3><pre id="technicalOutput"></pre></div>
+            <div><h3>Cifra tocável</h3><pre id="playableOutput"></pre></div>
+          </div>
+        </div>
+        <aside class="card side">
+          <h3>Relatório de incertezas</h3>
+          <pre id="reportOutput"></pre>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <template id="modalTemplate">
+    <div class="modal-backdrop">
+      <div class="modal">
+        <h3></h3>
+        <div class="modal-body"></div>
+        <div class="modal-actions"></div>
+      </div>
+    </div>
+  </template>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
