@@ -1,4 +1,4 @@
-const CACHE_NAME = "cpp-mvp-semiauto-v2-start-fix";
+const CACHE_NAME = "cpp-mvp-semiauto-v4-reading-improvements";
 const ASSETS = [
   "./",
   "./index.html",
