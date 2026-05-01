@@ -81,3 +81,34 @@
     transform:translate(10px,-50%)!important;
   }
 }
+
+/* FIX: permitir arrastar/centralizar a partitura no celular quando não estiver selecionando. */
+.selection-layer.selection-pannable,
+.selection-layer.selection-pannable *{
+  touch-action: pan-x pan-y !important;
+}
+.selection-layer.selection-active,
+.selection-layer.selection-active *{
+  touch-action: none !important;
+}
+.barline-work-layer.barline-pannable,
+.barline-work-layer.barline-pannable *{
+  touch-action: pan-x pan-y !important;
+}
+.barline-work-layer.barline-active.barline-adjusting,
+.barline-work-layer.barline-active.barline-adjusting *{
+  touch-action: none !important;
+}
+
+/* No mobile, os botões de apoio não podem ocupar a linha inteira de leitura. */
+@media(max-width:700px){
+  .floating-bar-controls{
+    overflow-x:auto;
+    justify-content:flex-start!important;
+    gap:6px!important;
+  }
+  .floating-bar-controls button{
+    flex:0 0 auto!important;
+    min-width:64px;
+  }
+}
