@@ -13,6 +13,7 @@ export class MeasureMarker{
     this.zoom=1.5;
     this.mode=false;
     this.draftBar=null;
+    this.draftStage='idle';
     this.draggingDraft=false;
   }
 
@@ -21,6 +22,7 @@ export class MeasureMarker{
     this.system=system;
     this.mode=false;
     this.draftBar=null;
+    this.draftStage='idle';
     this.draggingDraft=false;
     this.render();
   }
@@ -28,8 +30,7 @@ export class MeasureMarker{
   enableBarline(){
     if(!this.system) return;
     this.mode=true;
-    // Mobile-first: instead of forcing a precise tap, create a draggable vertical bar.
-    // The user moves it left/right and validates when aligned.
+    this.draftStage='adjusting';
     this.draftBar={x:Math.round(this.system.bbox.w/2),type:document.getElementById('barlineType')?.value||'simple_barline'};
     this.render();
   }
@@ -37,7 +38,21 @@ export class MeasureMarker{
   cancelDraft(){
     this.mode=false;
     this.draftBar=null;
+    this.draftStage='idle';
     this.draggingDraft=false;
+    this.render();
+  }
+
+  lockDraft(){
+    if(!this.draftBar) return;
+    this.draftStage='locked';
+    this.draggingDraft=false;
+    this.render();
+  }
+
+  editDraft(){
+    if(!this.draftBar) return;
+    this.draftStage='adjusting';
     this.render();
   }
 
@@ -55,12 +70,14 @@ export class MeasureMarker{
     });
     this.mode=false;
     this.draftBar=null;
+    this.draftStage='idle';
     this.draggingDraft=false;
     this.onChange();
+    this.render();
   }
 
   moveDraft(delta){
-    if(!this.draftBar||!this.system) return;
+    if(!this.draftBar||!this.system||this.draftStage!=='adjusting') return;
     this.draftBar.x=clamp(this.draftBar.x+delta,0,this.system.bbox.w);
     this.render();
   }
@@ -95,7 +112,6 @@ export class MeasureMarker{
     img.addEventListener('contextmenu',e=>e.preventDefault());
     layer.appendChild(img);
 
-    // Existing confirmed barlines
     for(const b of this.barlines()){
       const el=document.createElement('div');
       el.className='barline confirmed-barline';
@@ -105,7 +121,6 @@ export class MeasureMarker{
       layer.appendChild(el);
     }
 
-    // Existing measures
     for(const m of this.protocol.measures.filter(m=>m.system_id===this.system.system_id)){
       const el=document.createElement('div');
       el.className='measure-box';
@@ -118,45 +133,54 @@ export class MeasureMarker{
     }
 
     if(this.mode && this.draftBar){
+      const locked=this.draftStage==='locked';
       const badge=document.createElement('div');
-      badge.className='mode-badge';
-      badge.textContent='Ajuste a barra vermelha e toque em Validar';
+      badge.className='mode-badge '+(locked?'locked':'');
+      badge.textContent=locked
+        ? 'Barra travada para conferência. Se estiver certa, toque em Validar barra.'
+        : 'Posicione a barra. Depois toque em Posicionar para travar e conferir.';
       layer.appendChild(badge);
 
       const draft=document.createElement('div');
-      draft.className='draft-barline';
+      draft.className='draft-barline '+(locked?'locked':'adjusting');
       draft.style.left=this.draftBar.x*this.zoom+'px';
       draft.style.height=this.system.bbox.h*this.zoom+'px';
       draft.setAttribute('role','slider');
       draft.setAttribute('aria-label','Barra de compasso em ajuste');
       layer.appendChild(draft);
 
-      const handle=document.createElement('div');
-      handle.className='draft-barline-handle';
-      handle.style.left=this.draftBar.x*this.zoom+'px';
-      handle.textContent='↔';
-      layer.appendChild(handle);
+      if(!locked){
+        const handle=document.createElement('div');
+        handle.className='draft-barline-handle';
+        handle.style.left=this.draftBar.x*this.zoom+'px';
+        handle.textContent='↔';
+        layer.appendChild(handle);
 
-      const setFromEvent=(e)=>{
-        const rect=layer.getBoundingClientRect();
-        const x=(e.clientX-rect.left)/this.zoom;
-        this.draftBar.x=Math.round(clamp(x,0,this.system.bbox.w));
-      };
-      const start=(e)=>{e.preventDefault();this.draggingDraft=true;setFromEvent(e);this.render();};
-      const move=(e)=>{if(!this.draggingDraft)return;e.preventDefault();setFromEvent(e);this.render();};
-      const end=(e)=>{if(!this.draggingDraft)return;e.preventDefault();this.draggingDraft=false;this.render();};
-      draft.addEventListener('pointerdown',start,{passive:false});
-      handle.addEventListener('pointerdown',start,{passive:false});
-      layer.addEventListener('pointermove',move,{passive:false});
-      layer.addEventListener('pointerup',end,{passive:false});
-      layer.addEventListener('pointercancel',end,{passive:false});
+        const setFromEvent=(e)=>{
+          const rect=layer.getBoundingClientRect();
+          const x=(e.clientX-rect.left)/this.zoom;
+          this.draftBar.x=Math.round(clamp(x,0,this.system.bbox.w));
+        };
+        const start=(e)=>{e.preventDefault();this.draggingDraft=true;setFromEvent(e);this.render();};
+        const move=(e)=>{if(!this.draggingDraft)return;e.preventDefault();setFromEvent(e);this.render();};
+        const end=(e)=>{if(!this.draggingDraft)return;e.preventDefault();this.draggingDraft=false;this.render();};
+        draft.addEventListener('pointerdown',start,{passive:false});
+        handle.addEventListener('pointerdown',start,{passive:false});
+        layer.addEventListener('pointermove',move,{passive:false});
+        layer.addEventListener('pointerup',end,{passive:false});
+        layer.addEventListener('pointercancel',end,{passive:false});
+      }
 
       const controls=document.createElement('div');
-      controls.className='floating-bar-controls';
-      controls.innerHTML=`
+      controls.className='floating-bar-controls '+(locked?'locked':'adjusting');
+      controls.innerHTML = locked ? `
+        <button type="button" data-action="edit">Editar</button>
+        <button type="button" data-action="validate" class="primary">Validar barra</button>
+        <button type="button" data-action="cancel" class="danger-light">Cancelar</button>
+      ` : `
         <button type="button" data-action="left">← 1px</button>
         <button type="button" data-action="right">1px →</button>
-        <button type="button" data-action="validate" class="primary">Validar barra</button>
+        <button type="button" data-action="lock" class="primary">Posicionar</button>
         <button type="button" data-action="cancel" class="danger-light">Cancelar</button>
       `;
       controls.addEventListener('click',e=>{
@@ -165,6 +189,8 @@ export class MeasureMarker{
         const action=btn.dataset.action;
         if(action==='left') this.moveDraft(-1);
         if(action==='right') this.moveDraft(1);
+        if(action==='lock') this.lockDraft();
+        if(action==='edit') this.editDraft();
         if(action==='validate') this.validateDraft();
         if(action==='cancel') this.cancelDraft();
       });
