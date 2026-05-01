@@ -1,36 +1,85 @@
-export const STORAGE_KEY = "cpp_mvp_semiauto_protocol_v1";
+export const STORAGE_KEY = "cpp_professional_omr_protocol_v1";
 
 export function createInitialProtocol() {
   return {
-    cpp_version: "mvp-semi-auto-1.0",
-    source: { file_name: "", file_type: "", pages: 0 },
-    music: { title: "", key: "", meter_default: "3/4", tempo: "", composer: "", arranger: "" },
+    cpp_version: "professional-omr-1.0",
+    source: {
+      file_name: "",
+      file_type: "",
+      pages: 0,
+      omr_status: "pending",
+      omr_engine: "Audiveris",
+      ocr_status: "pending",
+      ocr_engine: "",
+      validation_status: "pending",
+      message: ""
+    },
+    music: {
+      title: "",
+      key: "",
+      meter_default: "3/4",
+      tempo: "",
+      composer: "",
+      arranger: ""
+    },
     pages: [],
     systems: [],
     measures: [],
-    system_analysis: [],
-    navigation: { visual_markers: [], execution_order: [], status: "visual_only" },
+    navigation: {
+      visual_markers: [],
+      execution_order: [],
+      status: "visual_only"
+    },
+    validation: {
+      validation_status: "pending",
+      overall_confidence: 0,
+      issues: []
+    },
     review: [],
-    ui_state: { current_measure_id: "", selected_marker_type: "", selected_marker_ids: [], cursor_position: { x: 0, y: 0 }, undo_stack: [] },
-    outputs: { technical_chord_sheet: "", playable_chord_sheet: "", uncertainty_report: "", detection_report: "" }
+    outputs: {
+      technical_chord_sheet: "",
+      playable_chord_sheet: "",
+      uncertainty_report: "",
+      detection_report: ""
+    }
   };
 }
 
-export function uid(prefix) {
-  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+export function normalizeProtocol(protocol) {
+  const base = createInitialProtocol();
+  const normalized = {
+    ...base,
+    ...(protocol || {}),
+    source: { ...base.source, ...(protocol?.source || {}) },
+    music: { ...base.music, ...(protocol?.music || {}) },
+    navigation: { ...base.navigation, ...(protocol?.navigation || {}) },
+    validation: { ...base.validation, ...(protocol?.validation || {}) },
+    outputs: { ...base.outputs, ...(protocol?.outputs || {}) }
+  };
+
+  normalized.cpp_version = "professional-omr-1.0";
+  normalized.pages ||= [];
+  normalized.systems ||= [];
+  normalized.measures ||= [];
+  normalized.review ||= [];
+  return normalized;
 }
 
 export function saveProtocol(protocol) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(protocol));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizeProtocol(protocol)));
 }
 
 export function loadProtocol() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : createInitialProtocol();
+    return raw ? normalizeProtocol(JSON.parse(raw)) : createInitialProtocol();
   } catch {
     return createInitialProtocol();
   }
+}
+
+export function uid(prefix) {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
 export function updateById(list, idKey, id, patch) {
@@ -39,19 +88,16 @@ export function updateById(list, idKey, id, patch) {
 }
 
 export function addRevision(protocol, action, target_id, old_value, new_value) {
+  protocol.review ||= [];
   protocol.review.push({
     id: uid("rev"),
     timestamp: new Date().toISOString(),
     action,
     target_id,
     old_value,
-    new_value
+    new_value,
+    source: "human_review"
   });
-}
-
-export function pushUndo(protocol, action) {
-  protocol.ui_state.undo_stack.push({ ...action, timestamp: Date.now() });
-  if (protocol.ui_state.undo_stack.length > 100) protocol.ui_state.undo_stack.shift();
 }
 
 export function getMeasure(protocol, measureId) {
@@ -63,5 +109,5 @@ export function getSystem(protocol, systemId) {
 }
 
 export function exportJson(protocol) {
-  return JSON.stringify(protocol, null, 2);
+  return JSON.stringify(normalizeProtocol(protocol), null, 2);
 }
