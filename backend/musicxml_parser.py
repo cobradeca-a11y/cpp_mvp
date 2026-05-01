@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from lxml import etree
@@ -22,20 +21,8 @@ def _txt(node: etree._Element, expr: str, default: str = "") -> str:
     return str(value).strip()
 
 
-def parse_musicxml_to_cpp(musicxml_path: str | Path, source_name: str = "") -> dict[str, Any]:
-    """Convert a MusicXML file into the CPP protocol shape.
-
-    This parser intentionally keeps the output conservative. It extracts what is
-    structurally reliable in MusicXML and leaves lyric/chord alignment for the
-    CPP review layer when needed.
-    """
-    path = Path(musicxml_path)
-    tree = etree.parse(str(path))
-    root = tree.getroot()
-
-    title = _txt(root, "string(//m:work/m:work-title)") or _txt(root, "string(//m:movement-title)") or source_name
-
-    protocol: dict[str, Any] = {
+def create_empty_professional_protocol(source_name: str = "") -> dict[str, Any]:
+    return {
         "cpp_version": "professional-omr-1.0",
         "source": {
             "file_name": source_name,
@@ -43,9 +30,13 @@ def parse_musicxml_to_cpp(musicxml_path: str | Path, source_name: str = "") -> d
             "pages": 0,
             "omr_status": "musicxml_parsed",
             "omr_engine": "Audiveris/MusicXML",
+            "ocr_status": "pending",
+            "ocr_engine": "",
+            "validation_status": "pending",
+            "message": "",
         },
         "music": {
-            "title": title,
+            "title": Path(source_name).stem if source_name else "",
             "key": "",
             "meter_default": "",
             "tempo": "",
@@ -55,8 +46,16 @@ def parse_musicxml_to_cpp(musicxml_path: str | Path, source_name: str = "") -> d
         "pages": [],
         "systems": [],
         "measures": [],
-        "system_analysis": [],
-        "navigation": {"visual_markers": [], "execution_order": [], "status": "visual_only"},
+        "navigation": {
+            "visual_markers": [],
+            "execution_order": [],
+            "status": "visual_only",
+        },
+        "validation": {
+            "validation_status": "pending",
+            "overall_confidence": 0,
+            "issues": [],
+        },
         "review": [],
         "outputs": {
             "technical_chord_sheet": "",
@@ -66,15 +65,55 @@ def parse_musicxml_to_cpp(musicxml_path: str | Path, source_name: str = "") -> d
         },
     }
 
+
+def parse_musicxml_to_cpp(musicxml_path: str | Path, source_name: str = "") -> dict[str, Any]:
+    """Convert MusicXML into the CPP professional protocol.
+
+    This parser is intentionally conservative. It extracts only structural data
+    present in MusicXML and leaves OCR/fusion/AI validation for later pipeline
+    stages. It must not invent missing lyrics, chords, navigation, or alignment.
+    """
+    path = Path(musicxml_path)
+    protocol = create_empty_professional_protocol(source_name)
+
+    try:
+        tree = etree.parse(str(path))
+    except Exception as exc:
+        protocol["source"]["omr_status"] = "failed"
+        protocol["source"]["message"] = f"Falha ao ler MusicXML: {exc}"
+        protocol["validation"]["validation_status"] = "needs_review"
+        protocol["validation"]["issues"].append({
+            "measure_number": None,
+            "issue_type": "musicxml_parse_error",
+            "severity": "high",
+            "evidence": str(exc),
+            "suggested_action": "Verificar se o arquivo MusicXML/MXL é válido.",
+            "needs_human_review": True,
+        })
+        return protocol
+
+    root = tree.getroot()
+    title = _txt(root, "string(//m:work/m:work-title)") or _txt(root, "string(//m:movement-title)") or Path(source_name).stem
+    protocol["music"]["title"] = title
+
     parts = _xp(root, "//m:part")
     if not parts:
-        protocol["source"]["omr_status"] = "no_parts_found"
+        protocol["source"]["omr_status"] = "failed"
+        protocol["source"]["message"] = "MusicXML sem partes musicais reconhecíveis."
+        protocol["validation"]["validation_status"] = "needs_review"
+        protocol["validation"]["issues"].append({
+            "measure_number": None,
+            "issue_type": "musicxml_no_parts_found",
+            "severity": "high",
+            "evidence": "Nenhum elemento <part> encontrado no MusicXML.",
+            "suggested_action": "Reexportar o MusicXML ou revisar o resultado do OMR.",
+            "needs_human_review": True,
+        })
         return protocol
 
     primary_part = parts[0]
     divisions = 1
     current_meter = ""
-    current_key = ""
     measure_number_fallback = 1
 
     for measure in _xp(primary_part, "./m:measure"):
@@ -99,10 +138,8 @@ def parse_musicxml_to_cpp(musicxml_path: str | Path, source_name: str = "") -> d
                     protocol["music"]["meter_default"] = current_meter
 
             fifths = _txt(attr0, "string(./m:key/m:fifths)")
-            if fifths:
-                current_key = fifths_to_key(fifths)
-                if not protocol["music"]["key"]:
-                    protocol["music"]["key"] = current_key
+            if fifths and not protocol["music"]["key"]:
+                protocol["music"]["key"] = fifths_to_key(fifths)
 
         measure_obj = {
             "measure_id": f"m{m_number:03d}",
@@ -110,8 +147,7 @@ def parse_musicxml_to_cpp(musicxml_path: str | Path, source_name: str = "") -> d
             "number": m_number,
             "meter": current_meter or protocol["music"].get("meter_default") or "",
             "is_anacrusis": False,
-            "bbox": {"x": 0, "y": 0, "w": 0, "h": 0},
-            "time_grid": time_grid(current_meter),
+            "time_grid": time_grid(current_meter or protocol["music"].get("meter_default", "")),
             "detected_elements": {
                 "chords": [],
                 "syllables": [],
@@ -127,7 +163,8 @@ def parse_musicxml_to_cpp(musicxml_path: str | Path, source_name: str = "") -> d
             "confidence": "provável",
             "review_required": True,
             "review_status": "pending",
-            "notes": "Importado de MusicXML; revisar alinhamento com cifras/letra quando necessário.",
+            "source": "musicxml",
+            "notes": "Importado de MusicXML; OCR/fusão ainda necessários para cifras e alinhamento definitivo.",
         }
 
         cursor_div = 0
@@ -142,22 +179,22 @@ def parse_musicxml_to_cpp(musicxml_path: str | Path, source_name: str = "") -> d
                 beat = beat_from_div(cursor_div, divisions, current_meter)
 
                 if is_rest:
-                    marker = marker("rest", "pausa", marker_index, beat, "musicxml", {"duration_divisions": dur})
-                    measure_obj["markers"].append(marker)
-                    measure_obj["detected_elements"]["rests"].append(marker)
+                    rest_marker = make_marker("rest", "pausa", marker_index, beat, "musicxml", {"duration_divisions": dur})
+                    measure_obj["markers"].append(rest_marker)
+                    measure_obj["detected_elements"]["rests"].append(rest_marker)
                     marker_index += 1
                 else:
                     pitch = pitch_name(child)
-                    note_marker = marker("note_head", pitch or "nota", marker_index, beat, "musicxml", {"duration_divisions": dur})
+                    note_marker = make_marker("note_head", pitch or "nota", marker_index, beat, "musicxml", {"duration_divisions": dur})
                     measure_obj["markers"].append(note_marker)
                     measure_obj["detected_elements"]["note_heads"].append(note_marker)
                     marker_index += 1
 
-                    for lt in lyric_texts:
-                        if lt:
-                            syll_marker = marker("syllable", lt, marker_index, beat, "musicxml", {"duration_divisions": dur})
-                            measure_obj["markers"].append(syll_marker)
-                            measure_obj["detected_elements"]["syllables"].append(syll_marker)
+                    for lyric_text in lyric_texts:
+                        if lyric_text:
+                            syllable_marker = make_marker("syllable", lyric_text, marker_index, beat, "musicxml", {"duration_divisions": dur})
+                            measure_obj["markers"].append(syllable_marker)
+                            measure_obj["detected_elements"]["syllables"].append(syllable_marker)
                             marker_index += 1
 
                 if not _xp(child, "./m:chord"):
@@ -166,7 +203,7 @@ def parse_musicxml_to_cpp(musicxml_path: str | Path, source_name: str = "") -> d
             elif tag in {"barline", "direction"}:
                 nav = detect_navigation(child)
                 if nav:
-                    nav_marker = marker("navigation", nav, marker_index, "", "musicxml", {})
+                    nav_marker = make_marker("navigation", nav, marker_index, "", "musicxml", {})
                     measure_obj["markers"].append(nav_marker)
                     measure_obj["detected_elements"]["navigation"].append(nav_marker)
                     protocol["navigation"]["visual_markers"].append({
@@ -177,10 +214,15 @@ def parse_musicxml_to_cpp(musicxml_path: str | Path, source_name: str = "") -> d
                     })
                     marker_index += 1
 
-        if measure_obj["detected_elements"]["note_heads"] or measure_obj["detected_elements"]["syllables"]:
+        if measure_obj["detected_elements"]["note_heads"] or measure_obj["detected_elements"]["syllables"] or measure_obj["detected_elements"]["rests"]:
             measure_obj["confidence"] = "provável"
         else:
             measure_obj["confidence"] = "incerto"
+            measure_obj["alignment_warnings"].append({
+                "type": "empty_musicxml_measure",
+                "severity": "medium",
+                "message": "Compasso sem notas, pausas ou letra importadas do MusicXML.",
+            })
 
         protocol["measures"].append(measure_obj)
         protocol["navigation"]["execution_order"].append({"measure_id": measure_obj["measure_id"], "repeat_instance": 1})
@@ -190,7 +232,6 @@ def parse_musicxml_to_cpp(musicxml_path: str | Path, source_name: str = "") -> d
         "system_id": "s001",
         "page_id": "p001",
         "number": 1,
-        "bbox": {"x": 0, "y": 0, "w": 0, "h": 0},
         "status": "musicxml_imported",
         "detected_summary": {
             "meter": protocol["music"].get("meter_default", ""),
@@ -200,20 +241,18 @@ def parse_musicxml_to_cpp(musicxml_path: str | Path, source_name: str = "") -> d
             "chords": [],
             "lyrics": collect_lyrics(protocol),
             "navigation": [x["type"] for x in protocol["navigation"]["visual_markers"]],
-            "warnings": ["Leitura OMR importada via MusicXML. Conferir cifras/acordes se não vierem no MusicXML."],
+            "warnings": ["Leitura estrutural importada via MusicXML. OCR/fusão ainda necessários para cifras e alinhamento definitivo."],
         },
     })
 
     return protocol
 
 
-def marker(kind: str, value: str, idx: int, beat: str, source: str, extra: dict[str, Any]) -> dict[str, Any]:
+def make_marker(kind: str, value: str, idx: int, beat: str, source: str, extra: dict[str, Any]) -> dict[str, Any]:
     return {
         "marker_id": f"mk{idx:03d}",
         "type": kind,
         "value": value,
-        "x": 0,
-        "y": 0,
         "beat": beat,
         "confidence": "provável" if source == "musicxml" else source,
         "source": source,
