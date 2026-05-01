@@ -14,6 +14,8 @@ import { globalUncertaintyReport } from "./modules/confidence-engine.js";
 import { downloadText, versioned } from "./modules/export-output.js";
 
 let protocol = loadProtocol();
+let selectedFile = null;
+let selectedFileValidation = null;
 let currentPage = null;
 let currentSystem = null;
 let currentMeasure = null;
@@ -181,11 +183,26 @@ function generateOutputs() {
 function initEvents() {
   document.querySelectorAll(".tab").forEach(btn => btn.onclick = () => switchTab(btn.dataset.tab));
 
-  $("fileInput").onchange = async ev => {
-    const file = ev.target.files[0];
+  $("fileInput").onchange = ev => {
+    selectedFile = ev.target.files[0] || null;
+    selectedFileValidation = validateFile(selectedFile);
+    $("fileInfo").textContent = selectedFile
+      ? `${selectedFile.name} — ${selectedFileValidation.message}`
+      : "Nenhum arquivo selecionado.";
+  };
+
+  async function startAnalysisFromSelectedFile() {
+    const file = selectedFile || $("fileInput").files?.[0];
     const valid = validateFile(file);
-    $("fileInfo").textContent = valid.message;
-    if (!valid.ok) return;
+    selectedFile = file;
+    selectedFileValidation = valid;
+
+    if (!valid.ok) {
+      $("fileInfo").textContent = valid.message;
+      toast(valid.message);
+      return;
+    }
+
     protocol = createInitialProtocol();
     protocol.source.file_name = file.name;
     protocol.source.file_type = valid.kind;
@@ -193,23 +210,37 @@ function initEvents() {
     protocol.music.key = $("musicKey").value;
     protocol.music.meter_default = $("meterDefault").value;
     protocol.music.tempo = $("tempo").value;
+
+    $("btnStart").disabled = true;
+    $("btnStart").textContent = "Renderizando...";
+    $("fileInfo").textContent = "Renderizando PDF/imagem. Aguarde...";
+    toast("Renderizando arquivo...");
+
     try {
-      toast("Renderizando arquivo...");
       protocol.pages = valid.kind === "pdf" ? await renderPdfFile(file, 3) : await renderImageFile(file);
       protocol.source.pages = protocol.pages.length;
+
+      if (!protocol.pages.length) throw new Error("Nenhuma página renderizada.");
+
       const q = assessPageQuality(protocol.pages[0]);
       $("fileInfo").textContent = `${file.name} — ${protocol.pages.length} página(s). Qualidade: ${q.status}. ${q.message}`;
+
       persist();
       refreshPage();
       refreshSystemsList();
-      toast("Arquivo carregado.");
+      switchTab("page");
+      toast("Página renderizada. Selecione o sistema.");
     } catch (err) {
       console.error(err);
+      $("fileInfo").textContent = "Erro ao renderizar. Verifique conexão/PDF.js ou tente recarregar a página.";
       toast("Erro ao renderizar arquivo.");
+    } finally {
+      $("btnStart").disabled = false;
+      $("btnStart").textContent = "Iniciar análise";
     }
-  };
+  }
 
-  $("btnStart").onclick = () => { refreshPage(); refreshSystemsList(); switchTab("page"); };
+  $("btnStart").onclick = startAnalysisFromSelectedFile;
   $("btnSelectSystem").onclick = () => pageCtl?.enableSelect(false);
   $("btnSystemTwoTap").onclick = () => pageCtl?.enableSelect(true);
   $("btnClearSystemDraft").onclick = () => pageCtl?.cancelSelect();
