@@ -1,0 +1,15 @@
+services:
+  cpp-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cpp-backend
+    ports:
+      - "8787:8787"
+    environment:
+      - AUDIVERIS_CMD=${AUDIVERIS_CMD:-audiveris}
+      - CPP_BACKEND_HOST=0.0.0.0
+      - CPP_BACKEND_PORT=8787
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
