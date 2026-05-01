@@ -31,7 +31,12 @@ export class MeasureMarker{
     if(!this.system) return;
     this.mode=true;
     this.draftStage='adjusting';
-    this.draftBar={x:Math.round(this.system.bbox.w/2),type:document.getElementById('barlineType')?.value||'simple_barline'};
+    // A barra nasce no centro da área visível, não no centro do sistema inteiro.
+    // Isso facilita marcar compassos mais à direita no celular: primeiro arraste a partitura
+    // até a região desejada, depois toque em Marcar barra.
+    const visibleCenter = (this.wrap.scrollLeft || 0) + (this.wrap.clientWidth || 0) / 2;
+    const initialX = Math.round(clamp(visibleCenter / this.zoom, 0, this.system.bbox.w));
+    this.draftBar={x:initialX,type:document.getElementById('barlineType')?.value||'simple_barline'};
     this.render();
   }
 
@@ -89,6 +94,8 @@ export class MeasureMarker{
   }
 
   render(){
+    const previousScrollLeft = this.wrap.scrollLeft || 0;
+    const previousScrollTop = this.wrap.scrollTop || 0;
     this.wrap.innerHTML='';
     if(!this.page||!this.system){
       this.wrap.innerHTML='<p class="hint">Selecione um sistema.</p>';
@@ -96,10 +103,10 @@ export class MeasureMarker{
     }
 
     const layer=document.createElement('div');
-    layer.className='work-layer barline-work-layer';
+    layer.className='work-layer barline-work-layer '+(this.mode?'barline-active':'barline-pannable')+' '+(this.draftStage==='adjusting'?'barline-adjusting':'');
     layer.style.width=this.system.bbox.w*this.zoom+'px';
     layer.style.height=this.system.bbox.h*this.zoom+'px';
-    layer.style.touchAction='none';
+    layer.style.touchAction=(this.mode && this.draftStage==='adjusting')?'none':'pan-x pan-y';
     layer.addEventListener('contextmenu',e=>e.preventDefault());
 
     const img=document.createElement('img');
@@ -174,12 +181,16 @@ export class MeasureMarker{
       const controls=document.createElement('div');
       controls.className='floating-bar-controls '+(locked?'locked':'adjusting');
       controls.innerHTML = locked ? `
+        <button type="button" data-action="panLeft">◀ ver</button>
+        <button type="button" data-action="panRight">ver ▶</button>
         <button type="button" data-action="edit">Editar</button>
         <button type="button" data-action="validate" class="primary">Validar barra</button>
         <button type="button" data-action="cancel" class="danger-light">Cancelar</button>
       ` : `
+        <button type="button" data-action="panLeft">◀ ver</button>
         <button type="button" data-action="left">← 1px</button>
         <button type="button" data-action="right">1px →</button>
+        <button type="button" data-action="panRight">ver ▶</button>
         <button type="button" data-action="lock" class="primary">Posicionar</button>
         <button type="button" data-action="cancel" class="danger-light">Cancelar</button>
       `;
@@ -187,6 +198,8 @@ export class MeasureMarker{
         const btn=e.target.closest('button');
         if(!btn) return;
         const action=btn.dataset.action;
+        if(action==='panLeft') this.wrap.scrollBy({left:-Math.max(120,this.wrap.clientWidth*0.6),behavior:'smooth'});
+        if(action==='panRight') this.wrap.scrollBy({left:Math.max(120,this.wrap.clientWidth*0.6),behavior:'smooth'});
         if(action==='left') this.moveDraft(-1);
         if(action==='right') this.moveDraft(1);
         if(action==='lock') this.lockDraft();
@@ -198,6 +211,10 @@ export class MeasureMarker{
     }
 
     this.wrap.appendChild(layer);
+    // Preserva a posição de rolagem a cada redesenho. Sem isso, o usuário perde
+    // o trecho que estava centralizado ao ajustar uma barra.
+    this.wrap.scrollLeft = previousScrollLeft;
+    this.wrap.scrollTop = previousScrollTop;
   }
 
   generateMeasures(meter='3/4'){

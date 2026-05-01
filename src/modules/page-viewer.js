@@ -24,10 +24,10 @@ export class PageViewer{
     this.wrap.innerHTML='';
     if(!this.page){this.wrap.innerHTML='<p class="hint">Carregue uma página.</p>';return;}
     const layer=document.createElement('div');
-    layer.className='work-layer selection-layer';
+    layer.className='work-layer selection-layer '+(this.mode==='system'?'selection-active':'selection-pannable');
     layer.style.width=`${this.page.width*this.zoom}px`;
     layer.style.height=`${this.page.height*this.zoom}px`;
-    layer.style.touchAction=this.mode==='system'?'none':'auto';
+    layer.style.touchAction=this.mode==='system'?'none':'pan-x pan-y';
 
     const img=document.createElement('img');
     img.src=this.page.image_src;
