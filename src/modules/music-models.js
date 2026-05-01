@@ -1,19 +1,56 @@
-export function timeGridForMeter(meter){
-  if(meter==='2/4') return ['1','e','2','e'];
-  if(meter==='4/4') return ['1','e','2','e','3','e','4','e'];
-  return ['1','e','2','e','3','e'];
+export function timeGridForMeter(meter = "3/4") {
+  if (meter === "2/4") return ["1", "e", "2", "e"];
+  if (meter === "4/4") return ["1", "e", "2", "e", "3", "e", "4", "e"];
+  return ["1", "e", "2", "e", "3", "e"];
 }
-export function isValidChord(symbol=''){
-  const s=symbol.trim();
-  if(!s) return false;
-  const chord=/^[A-G](#|b)?(m|maj|min|dim|aug|sus)?\d*(\([^)]*\))?(add\d+)?(maj\d+)?(m\d+)?(\([^)]*\))?(\/[A-G](#|b)?)?$/;
-  const slash=/^[A-G](#|b)?\/[A-G](#|b)?$/;
-  return chord.test(s)||slash.test(s);
+
+export function beatFromX(x, measureWidth, meter = "3/4") {
+  const grid = timeGridForMeter(meter);
+  if (!measureWidth || measureWidth <= 0) return grid[0];
+  const idx = Math.max(0, Math.min(grid.length - 1, Math.round((x / measureWidth) * (grid.length - 1))));
+  return grid[idx];
 }
-export function nearestBeat(x, measureWidth, grid){
-  if(!grid?.length || !measureWidth) return '';
-  let best=grid[0], bestD=Infinity;
-  grid.forEach((g,i)=>{const gx=(measureWidth*(i/(Math.max(grid.length-1,1)))); const d=Math.abs(x-gx); if(d<bestD){bestD=d; best=g;}});
-  return best;
+
+export function isChordSymbol(text = "") {
+  const t = String(text).trim()
+    .replaceAll("‹", "m")
+    .replaceAll("©", "#")
+    .replaceAll("¨", "b")
+    .replaceAll("Œ„Š", "maj")
+    .replaceAll("„ˆˆ", "add");
+  if (!t) return false;
+  if (t.length > 20) return false;
+  return /^[A-G](#|b)?(m|maj|min|dim|aug|sus)?\d*(\([^)]+\))?(add\d+)?(\/[A-G](#|b)?)?$/.test(t)
+      || /^[A-G](#|b)?\/[A-G](#|b)?$/.test(t);
 }
-export function markerColor(type){return {chord:'#2563eb',syllable:'#16a34a',note_head:'#7c3aed',beat:'#f97316',rest:'#64748b',navigation:'#db2777'}[type]||'#111827';}
+
+export function normalizeChord(text = "") {
+  return String(text).trim()
+    .replaceAll("‹", "m")
+    .replaceAll("©", "#")
+    .replaceAll("¨", "b")
+    .replaceAll("Œ„Š", "maj")
+    .replaceAll("„ˆˆ", "add")
+    .replaceAll("–", "-");
+}
+
+export function isNavigationText(text = "") {
+  return /\b(D\.?S\.?|D\.?C\.?|Coda|Fine|Segno|Al\s*Coda|To\s*Coda)\b/i.test(String(text));
+}
+
+export function looksLikeLyric(text = "") {
+  const t = String(text).trim();
+  if (!t) return false;
+  if (isChordSymbol(t) || isNavigationText(t)) return false;
+  if (/^\d+$/.test(t)) return false;
+  return /[A-Za-zÀ-ÿ]/.test(t);
+}
+
+export function confidenceRank(c) {
+  return { "certo": 0, "provável": 1, "incerto": 2, "ilegível": 3 }[c] ?? 1;
+}
+
+export function worstConfidence(values) {
+  if (!values.length) return "provável";
+  return values.sort((a,b) => confidenceRank(b)-confidenceRank(a))[0];
+}

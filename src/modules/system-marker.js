@@ -1,3 +1,15 @@
-export function removeSystem(protocol, systemId){protocol.systems=protocol.systems.filter(s=>s.system_id!==systemId); const measureIds=protocol.measures.filter(m=>m.system_id===systemId).map(m=>m.measure_id); protocol.measures=protocol.measures.filter(m=>m.system_id!==systemId); protocol.navigation.visual_markers=protocol.navigation.visual_markers.filter(n=>!measureIds.includes(n.measure_id));}
-export function renumberSystems(protocol){const byPage={}; protocol.systems.sort((a,b)=>a.page_id.localeCompare(b.page_id)||a.bbox.y-b.bbox.y).forEach(s=>{byPage[s.page_id]=(byPage[s.page_id]||0)+1;s.number=byPage[s.page_id];});}
-export function systemImage(page, system){return {src:page.image_src, x:system.bbox.x, y:system.bbox.y, w:system.bbox.w, h:system.bbox.h};}
+export function removeSystem(protocol, systemId) {
+  protocol.systems = protocol.systems.filter(s => s.system_id !== systemId);
+  protocol.measures = protocol.measures.filter(m => m.system_id !== systemId);
+}
+
+export function renumberSystems(protocol) {
+  const byPage = {};
+  protocol.systems.forEach(s => {
+    byPage[s.page_id] ||= [];
+    byPage[s.page_id].push(s);
+  });
+  Object.values(byPage).forEach(list => {
+    list.sort((a,b) => a.bbox.y - b.bbox.y).forEach((s,i) => s.number = i + 1);
+  });
+}
