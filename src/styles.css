@@ -39,3 +39,45 @@
   .floating-bar-controls.locked{bottom:74px}
   .mode-badge.locked{bottom:135px}
 }
+
+/* Ajuste solicitado: barra de marcação ultrafina para permitir ver a barra real da partitura. */
+.confirmed-barline{
+  width:1px!important;
+  box-shadow:none!important;
+  background:#dc2626!important;
+}
+.draft-barline,
+.draft-barline.adjusting,
+.draft-barline.locked{
+  width:1px!important;
+  box-shadow:none!important;
+}
+.draft-barline::before{
+  background:transparent!important;
+  left:-28px!important;
+  right:-28px!important;
+}
+.draft-barline.locked::before{
+  display:none!important;
+  content:none!important;
+}
+.draft-barline-handle{
+  width:34px!important;
+  height:34px!important;
+  border:2px solid #fff!important;
+  transform:translate(10px,-50%)!important;
+  background:rgba(239,68,68,.92)!important;
+  box-shadow:0 4px 12px rgba(0,0,0,.28)!important;
+}
+@media(max-width:700px){
+  .draft-barline,
+  .draft-barline.adjusting,
+  .draft-barline.locked{
+    width:1px!important;
+  }
+  .draft-barline-handle{
+    width:38px!important;
+    height:38px!important;
+    transform:translate(10px,-50%)!important;
+  }
+}
