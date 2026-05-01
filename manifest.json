@@ -1,6 +1,6 @@
 {
-  "name": "CPP — Conversor de Partituras Pedagógico",
-  "short_name": "CPP",
+  "name": "cpp_pro — Conversor Profissional de Partituras",
+  "short_name": "cpp_pro",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#f8fafc",
