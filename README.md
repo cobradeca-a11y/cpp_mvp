@@ -1,10 +1,10 @@
-# CPP — Conversor Profissional de Partituras
+# cpp_pro — Conversor Profissional de Partituras
 
-O CPP é uma aplicação para converter partituras em PDF/imagem em cifra técnica e cifra tocável, usando uma arquitetura profissional baseada em OMR, MusicXML, revisão humana e exportação.
+O `cpp_pro` é uma aplicação para converter partituras em PDF/imagem em cifra técnica e cifra tocável, usando uma arquitetura profissional baseada em OMR, MusicXML, revisão humana e exportação.
 
 ## Decisão arquitetural
 
-O CPP não usa heurísticas visuais como motor principal de leitura.
+O `cpp_pro` não usa heurísticas visuais como motor principal de leitura.
 
 O fluxo oficial é:
 
@@ -34,6 +34,12 @@ O protocolo oficial está em:
 docs/CPP_PROTOCOL_PROFISSIONAL.md
 ```
 
+O documento-mestre operacional está em:
+
+```txt
+estrutura_cpp_profissional_atualizada.txt
+```
+
 ## Estrutura atual
 
 ```txt
@@ -42,6 +48,12 @@ backend/
   musicxml_parser.py
   requirements.txt
   README.md
+  Dockerfile
+  test_backend.py
+
+scripts/
+  start-backend.sh
+  start-frontend.sh
 
 src/
   app.js
@@ -55,6 +67,7 @@ src/
     chord-sheet-technical.js
     chord-sheet-playable.js
     confidence-engine.js
+    navigation-engine.js
     export-output.js
 
 docs/
@@ -65,6 +78,7 @@ manifest.json
 service-worker.js
 .env.example
 docker-compose.yml
+estrutura_cpp_profissional_atualizada.txt
 ```
 
 ## Requisitos
@@ -153,7 +167,7 @@ http://localhost:8787
 
 ## Fluxo de uso
 
-1. Abra o CPP.
+1. Abra o `cpp_pro`.
 2. Verifique o backend.
 3. Envie PDF/imagem/MusicXML.
 4. Clique em `Processar com OMR Profissional`.
@@ -163,7 +177,7 @@ http://localhost:8787
 
 ## Saídas
 
-O CPP gera:
+O `cpp_pro` gera:
 
 - `cpp_protocol.json`;
 - cifra técnica;
@@ -187,8 +201,12 @@ Testes com PDF real: pendente
 
 ## Próximas etapas
 
-1. Integrar OCR profissional.
-2. Criar motor de fusão MusicXML + OCR.
-3. Adicionar IA validadora estruturada.
-4. Criar testes com PDF real.
-5. Refinar geração de cifra tocável.
+1. Rodar auditorias de terminal/CMD.
+2. Validar backend com pytest.
+3. Validar frontend local.
+4. Testar upload MusicXML direto.
+5. Testar PDF real com Audiveris instalado.
+6. Integrar OCR profissional.
+7. Criar motor de fusão MusicXML + OCR.
+8. Adicionar IA validadora estruturada.
+9. Refinar geração de cifra tocável final.
