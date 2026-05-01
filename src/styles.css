@@ -28,3 +28,14 @@
 .floating-bar-controls{position:sticky;left:8px;bottom:8px;z-index:90;display:flex;gap:8px;align-items:center;background:rgba(15,23,42,.92);padding:8px;border-radius:14px;width:max-content;max-width:calc(100vw - 44px);box-shadow:0 10px 28px rgba(0,0,0,.35)}
 .floating-bar-controls button{border:0;border-radius:10px;padding:9px 11px;background:#fff;color:#0f172a;font-weight:800}.floating-bar-controls button.primary{background:#2563eb;color:#fff}.floating-bar-controls button.danger-light{background:#fee2e2;color:#991b1b}
 @media(max-width:700px){.floating-bar-controls{position:fixed;left:10px;right:10px;bottom:74px;width:auto;justify-content:space-between}.floating-bar-controls button{flex:1;padding:11px 8px;font-size:12px}.draft-barline-handle{width:54px;height:54px}.draft-barline{width:5px}.mode-badge{position:fixed;top:auto;bottom:135px;left:12px;right:12px;text-align:center}}
+
+/* Barline two-step mobile flow: ajustar -> posicionar/travar -> validar */
+.draft-barline.adjusting{background:#ef4444;width:4px;z-index:70;transform:translateX(-50%);box-shadow:0 0 0 2px rgba(255,255,255,.9),0 0 18px rgba(239,68,68,.6);touch-action:none;cursor:ew-resize}
+.draft-barline.locked{background:#0284c7;width:2px;z-index:70;transform:translateX(-50%);box-shadow:0 0 0 1px rgba(255,255,255,.95);pointer-events:none}
+.draft-barline.locked::before{display:none!important;content:none!important}
+.floating-bar-controls.locked{background:rgba(2,6,23,.88)}
+.mode-badge.locked{background:#0284c7;color:white;border-color:#0369a1}
+@media(max-width:700px){
+  .floating-bar-controls.locked{bottom:74px}
+  .mode-badge.locked{bottom:135px}
+}
