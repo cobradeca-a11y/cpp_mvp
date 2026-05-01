@@ -2,162 +2,196 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+  <meta name="theme-color" content="#111827" />
   <title>CPP — Conversor de Partituras Pedagógico</title>
-  <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="src/styles.css" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="stylesheet" href="./src/styles.css" />
 </head>
 <body>
-  <header class="topbar">
+  <header class="app-header">
     <div>
       <h1>CPP</h1>
-      <p>Conversor de Partituras Pedagógico — MVP local/PWA</p>
+      <p>Conversor de Partituras Pedagógico — MVP semiautomático por sistema</p>
     </div>
-    <div class="status-pill" id="saveStatus">Sessão local pronta</div>
+    <button id="btnInstall" class="ghost hidden">Instalar</button>
   </header>
 
-  <nav class="tabs" aria-label="Telas do CPP">
-    <button data-screen="upload" class="active">1. Upload</button>
-    <button data-screen="page">2. Página</button>
-    <button data-screen="systems">3. Sistemas/Compassos</button>
-    <button data-screen="measure">4. Editor</button>
-    <button data-screen="output">5. Saída</button>
+  <nav class="tabs">
+    <button data-tab="upload" class="tab active">1 Upload</button>
+    <button data-tab="page" class="tab">2 Página</button>
+    <button data-tab="system" class="tab">3 Sistema</button>
+    <button data-tab="review" class="tab">4 Revisão</button>
+    <button data-tab="output" class="tab">5 Saída</button>
   </nav>
 
   <main>
-    <section id="screen-upload" class="screen active">
+    <section id="tab-upload" class="panel active">
+      <h2>Upload</h2>
+      <p class="hint">Carregue PDF/JPG/PNG/WEBP. O PDF piloto é apenas teste; o app deve funcionar genericamente.</p>
+
       <div class="card">
-        <h2>1. Upload</h2>
-        <p>Carregue PDF, JPG, PNG ou WEBP. O MVP é semiassistido: você marca sistemas, compassos e alinhamentos.</p>
-        <div class="upload-box">
-          <input id="fileInput" type="file" accept="application/pdf,image/png,image/jpeg,image/webp" />
-          <button id="startAnalysisBtn" class="primary">Iniciar análise</button>
+        <input id="fileInput" type="file" accept=".pdf,image/png,image/jpeg,image/webp" />
+        <div id="fileInfo" class="info"></div>
+        <div class="grid2">
+          <label>Título <input id="musicTitle" placeholder="Título da música" /></label>
+          <label>Tom <input id="musicKey" placeholder="Ex.: D, G, C" /></label>
+          <label>Compasso padrão
+            <select id="meterDefault">
+              <option>2/4</option>
+              <option selected>3/4</option>
+              <option>4/4</option>
+            </select>
+          </label>
+          <label>Andamento <input id="tempo" placeholder="Ex.: ♩ = 75-85" /></label>
         </div>
-        <dl class="info-grid">
-          <dt>Arquivo</dt><dd id="fileName">—</dd>
-          <dt>Tipo</dt><dd id="fileType">—</dd>
-          <dt>Páginas</dt><dd id="filePages">—</dd>
-          <dt>Qualidade</dt><dd id="qualityNotice">Aguardando arquivo</dd>
-        </dl>
+        <button id="btnStart" class="primary">Iniciar análise</button>
       </div>
     </section>
 
-    <section id="screen-page" class="screen">
-      <div class="layout two">
-        <div class="card">
-          <h2>2. Página</h2>
-          <div class="toolbar">
-            <label>Zoom <input id="pageZoom" type="range" min="0.35" max="2.5" step="0.05" value="1" /></label>
-            <button id="newSystemBtn">Selecionar sistema</button>
-            <button id="clearSystemsBtn" class="danger">Limpar sistemas</button>
-          </div>
-          <p class="hint">Clique em “Selecionar sistema”, arraste um retângulo sobre uma linha musical completa e solte.</p>
-          <div id="pageCanvasWrap" class="canvas-wrap large"></div>
+    <section id="tab-page" class="panel">
+      <h2>Página / Sistemas</h2>
+      <p class="hint">Selecione um sistema/linha da partitura. No celular, use dois toques: canto superior esquerdo e canto inferior direito.</p>
+
+      <div class="toolbar sticky">
+        <button id="btnSelectSystem" class="primary">Selecionar sistema</button>
+        <button id="btnSystemTwoTap" class="ghost">Modo 2 toques</button>
+        <button id="btnClearSystemDraft" class="ghost">Cancelar seleção</button>
+        <button id="pageZoomOut">Zoom -</button>
+        <button id="pageZoomIn">Zoom +</button>
+      </div>
+
+      <div class="layout">
+        <div class="viewer-wrap">
+          <div id="pageViewer" class="viewer"></div>
         </div>
-        <aside class="card side">
+        <aside class="side">
           <h3>Sistemas</h3>
-          <ul id="systemsList" class="list"></ul>
+          <div id="systemsList" class="list"></div>
         </aside>
       </div>
     </section>
 
-    <section id="screen-systems" class="screen">
-      <div class="layout two">
-        <div class="card">
-          <h2>3. Sistemas e compassos</h2>
-          <div class="toolbar">
-            <label>Sistema <select id="systemSelect"></select></label>
-            <label>Compasso padrão <select id="meterSelect"><option>3/4</option><option>2/4</option><option>4/4</option></select></label>
-            <button id="addBarlineModeBtn">Marcar barra</button>
-            <button id="generateMeasuresBtn" class="primary">Gerar compassos</button>
-          </div>
-          <p class="hint">Clique no sistema para marcar barras. Depois gere os compassos entre as barras.</p>
-          <div id="systemCanvasWrap" class="canvas-wrap medium"></div>
+    <section id="tab-system" class="panel">
+      <h2>Sistema</h2>
+      <p class="hint">Gere os compassos, ajuste barras duvidosas e depois analise o sistema.</p>
+
+      <div class="toolbar sticky">
+        <button id="btnGenerateMeasures" class="primary">Gerar compassos</button>
+        <button id="btnAddBar">Adicionar barra</button>
+        <button id="btnMoveBarLeft">← 1px</button>
+        <button id="btnMoveBarRight">1px →</button>
+        <button id="btnPositionBar">Posicionar</button>
+        <button id="btnEditBar">Editar</button>
+        <button id="btnValidateBar" class="ok">Validar barra</button>
+        <button id="btnAnalyzeSystem" class="primary">Analisar sistema</button>
+      </div>
+
+      <div class="layout">
+        <div class="viewer-wrap">
+          <div id="systemViewer" class="viewer system-viewer"></div>
         </div>
-        <aside class="card side">
-          <h3>Barras do sistema</h3>
-          <div class="toolbar vertical">
-            <label>Tipo <select id="barlineType"><option>simple_barline</option><option>double_barline</option><option>repeat_start</option><option>repeat_end</option><option>final_barline</option></select></label>
-          </div>
-          <ul id="barlinesList" class="list"></ul>
+        <aside class="side">
+          <h3>Sistema atual</h3>
+          <div id="currentSystemInfo" class="info"></div>
+          <h3>Barras</h3>
+          <div id="barsList" class="list"></div>
           <h3>Compassos</h3>
-          <ul id="measuresList" class="list"></ul>
+          <div id="measuresList" class="list"></div>
+          <h3>Feedback do sistema</h3>
+          <pre id="systemFeedback" class="report"></pre>
         </aside>
       </div>
     </section>
 
-    <section id="screen-measure" class="screen">
-      <div class="layout editor-grid">
-        <div class="card">
-          <h2>4. Editor de compasso</h2>
-          <div class="toolbar wrap">
-            <label>Compasso <select id="measureSelect"></select></label>
-            <label>Zoom <input id="measureZoom" type="range" min="1" max="5" step="0.25" value="2" /></label>
-            <label>Lupa <input id="lensZoom" type="range" min="2" max="8" step="0.5" value="4" /></label>
-            <label>Tipo <select id="markerType"><option value="chord">chord</option><option value="syllable">syllable</option><option value="note_head">note_head</option><option value="beat">beat</option><option value="rest">rest</option><option value="navigation">navigation</option></select></label>
-            <button id="undoBtn">Undo</button>
-            <button id="approveMeasureBtn" class="primary">Aprovar compasso</button>
-            <button id="pendingMeasureBtn">Marcar pendente</button>
+    <section id="tab-review" class="panel">
+      <h2>Revisão de compasso</h2>
+      <p class="hint">Revise o que o CPP detectou. Marcação manual é correção, não fluxo principal.</p>
+
+      <div class="toolbar sticky">
+        <button id="btnPrevMeasure">Compasso anterior</button>
+        <button id="btnAcceptMeasure" class="ok">Aceitar leitura</button>
+        <button id="btnEditMeasure">Editar leitura</button>
+        <button id="btnMarkUncertain" class="warn">Marcar incerto</button>
+        <button id="btnNextMeasure">Próximo compasso</button>
+      </div>
+
+      <div class="layout">
+        <div>
+          <div id="measureCanvasWrap" class="viewer measure-viewer"></div>
+
+          <div id="manualEdit" class="card hidden">
+            <h3>Edição manual</h3>
+            <div class="toolbar wrap">
+              <select id="markerType">
+                <option value="chord">Acorde</option>
+                <option value="syllable">Sílaba</option>
+                <option value="note_head">Cabeça de nota</option>
+                <option value="rest">Pausa</option>
+                <option value="navigation">Navegação</option>
+              </select>
+              <input id="markerValue" placeholder="Valor: D, Re-, nota..." />
+              <select id="alignmentType">
+                <option value="chord_on_syllable">acorde sobre sílaba</option>
+                <option value="chord_before_syllable">acorde antes da sílaba</option>
+                <option value="chord_between_syllables">acorde entre sílabas</option>
+                <option value="chord_on_rest">acorde sobre pausa</option>
+                <option value="chord_at_measure_start">acorde no início</option>
+              </select>
+              <button id="btnCreateAlignment">Criar alinhamento provável</button>
+              <button id="btnUndo">Desfazer</button>
+            </div>
+            <p class="hint">Clique no compasso para inserir marcador. Selecione marcadores na lista para criar alinhamento.</p>
+            <div id="markersList" class="list"></div>
           </div>
-          <div id="measureCanvasWrap" class="canvas-wrap editor"></div>
         </div>
 
-        <aside class="card side">
-          <h3>Marcadores</h3>
-          <ul id="markersList" class="list compact"></ul>
-          <h3>Criar alinhamento</h3>
-          <div class="form-stack">
-            <label>Acorde <select id="alignChord"></select></label>
-            <label>Sílaba <select id="alignSyllable"></select></label>
-            <label>Nota <select id="alignNote"></select></label>
-            <label>Tipo <select id="alignType"><option>chord_on_syllable</option><option>chord_before_syllable</option><option>chord_between_syllables</option><option>chord_on_rest</option><option>chord_at_measure_start</option></select></label>
-            <label>Confiança <select id="alignConfidence"><option>certo</option><option>provável</option><option>incerto</option><option>ilegível</option></select></label>
-            <label><input id="simultaneousEvent" type="checkbox" /> Evento simultâneo</label>
-            <textarea id="alignObservation" placeholder="Observação"></textarea>
-            <button id="createAlignmentBtn" class="primary">Criar alinhamento</button>
-          </div>
-          <h3>Alinhamentos</h3>
-          <ul id="alignmentsList" class="list compact"></ul>
+        <aside class="side">
+          <h3>Leitura detectada</h3>
+          <pre id="measureFeedback" class="report"></pre>
+          <h3>Ações</h3>
+          <button id="btnGoOutput" class="primary full">Ir para saída</button>
         </aside>
       </div>
     </section>
 
-    <section id="screen-output" class="screen">
-      <div class="layout two">
+    <section id="tab-output" class="panel">
+      <h2>Saída</h2>
+
+      <div class="toolbar sticky">
+        <button id="btnGenerateOutputs" class="primary">Gerar saídas</button>
+        <button id="btnExportJson">Exportar JSON</button>
+        <button id="btnExportTech">Exportar cifra técnica</button>
+        <button id="btnExportPlayable">Exportar cifra tocável</button>
+        <button id="btnExportUncertainty">Exportar incertezas</button>
+        <button id="btnExportDetection">Exportar detecção</button>
+        <button id="btnExportAll" class="ok">Exportar pacote</button>
+      </div>
+
+      <div class="grid2">
         <div class="card">
-          <h2>5. Saída</h2>
-          <div class="toolbar wrap">
-            <button id="generateOutputsBtn" class="primary">Gerar saídas</button>
-            <button id="exportJsonBtn">Exportar JSON</button>
-            <button id="exportTechnicalBtn">Exportar cifra técnica</button>
-            <button id="exportPlayableBtn">Exportar cifra tocável</button>
-            <button id="exportReportBtn">Exportar relatório</button>
-            <button id="exportAllBtn">Exportar pacote</button>
-          </div>
-          <div class="output-grid">
-            <div><h3>Cifra técnica</h3><pre id="technicalOutput"></pre></div>
-            <div><h3>Cifra tocável</h3><pre id="playableOutput"></pre></div>
-          </div>
+          <h3>Cifra técnica</h3>
+          <pre id="technicalOutput" class="output"></pre>
         </div>
-        <aside class="card side">
+        <div class="card">
+          <h3>Cifra tocável</h3>
+          <pre id="playableOutput" class="output"></pre>
+        </div>
+        <div class="card">
           <h3>Relatório de incertezas</h3>
-          <pre id="reportOutput"></pre>
-        </aside>
+          <pre id="uncertaintyOutput" class="output"></pre>
+        </div>
+        <div class="card">
+          <h3>Relatório de detecção</h3>
+          <pre id="detectionOutput" class="output"></pre>
+        </div>
       </div>
     </section>
   </main>
 
-  <template id="modalTemplate">
-    <div class="modal-backdrop">
-      <div class="modal">
-        <h3></h3>
-        <div class="modal-body"></div>
-        <div class="modal-actions"></div>
-      </div>
-    </div>
-  </template>
+  <div id="toast" class="toast hidden"></div>
 
-  <script type="module" src="src/app.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script type="module" src="./src/app.js"></script>
 </body>
 </html>
