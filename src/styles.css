@@ -5,3 +5,11 @@
 .selection-layer, .work-layer { touch-action: none; }
 .mode-badge{position:absolute;left:10px;top:10px;z-index:50;background:#0f172a;color:#fff;border-radius:999px;padding:7px 10px;font-size:12px;box-shadow:0 4px 16px rgba(0,0,0,.25);pointer-events:none}.active-rect{background:rgba(37,99,235,.16);border-color:#1d4ed8}
 @media(max-width:700px){main{padding:10px}.topbar{padding:12px 14px}.topbar h1{font-size:22px}.tabs{padding:8px;gap:6px}.tabs button{padding:8px 10px;font-size:12px}.card{padding:10px;border-radius:14px}.toolbar{gap:6px}.layout.two,.editor-grid,.output-grid{grid-template-columns:1fr}.side{order:2}.canvas-wrap.large,.canvas-wrap.medium,.canvas-wrap.editor{height:62vh;max-width:100%;overflow:auto}.canvas-wrap{max-width:100%}.work-layer{min-width:max-content}.status-pill{display:inline-block;margin-top:8px}.upload-box{display:block}.upload-box input{max-width:100%}}
+/* Strong mobile selection fixes */
+.selection-layer, .selection-layer *{
+  -webkit-user-select:none;
+  user-select:none;
+  -webkit-touch-callout:none;
+  touch-action:none;
+}
+.tap-start-dot{position:absolute;transform:translate(-50%,-50%);width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:#2563eb;color:#fff;font-weight:800;border:3px solid #fff;box-shadow:0 3px 12px rgba(0,0,0,.35);z-index:60;pointer-events:none}
