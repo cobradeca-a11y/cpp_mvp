@@ -1,4 +1,4 @@
-CPP — CONVERSOR PROFISSIONAL DE PARTITURAS PEDAGÓGICAS
+cpp_pro — CONVERSOR PROFISSIONAL DE PARTITURAS PEDAGÓGICAS
 ESTRUTURA CONSOLIDADA ATUALIZADA
 VERSÃO: PROFISSIONAL OMR + MUSICXML + OCR + VALIDAÇÃO
 STATUS: DOCUMENTO-MESTRE DO PROJETO
@@ -7,7 +7,7 @@ STATUS: DOCUMENTO-MESTRE DO PROJETO
 0. DIRETRIZ OPERACIONAL PERMANENTE DO PROJETO
 ============================================================
 
-A partir desta versão, todo trabalho no CPP deve seguir padrão profissional.
+A partir desta versão, todo trabalho no cpp_pro deve seguir padrão profissional.
 
 Regras permanentes:
 
@@ -71,11 +71,11 @@ Exportação
 
 Regra central:
 
-O CPP profissional não adivinha a música pela imagem.
+O cpp_pro profissional não adivinha a música pela imagem.
 Ele processa por motores especializados, registra evidências, valida inconsistências e guia a revisão humana.
 
 ============================================================
-2. OBJETIVO DO CPP PROFISSIONAL
+2. OBJETIVO DO cpp_pro PROFISSIONAL
 ============================================================
 
 Transformar partituras em PDF/imagem em cifra técnica e cifra tocável fiel, preservando:
@@ -95,7 +95,7 @@ Transformar partituras em PDF/imagem em cifra técnica e cifra tocável fiel, pr
 - relatório de detecção;
 - relatório de inconsistências.
 
-O CPP não deve:
+O cpp_pro não deve:
 
 - adivinhar harmonia;
 - rearmonizar;
@@ -104,7 +104,7 @@ O CPP não deve:
 - inventar cifra a partir de aparência visual;
 - tratar heurística local como fonte primária.
 
-O CPP deve:
+O cpp_pro deve:
 
 - extrair estrutura musical por OMR/MusicXML;
 - extrair texto/layout por OCR profissional;
@@ -138,7 +138,7 @@ Fontes proibidas como motor principal:
 4. ARQUITETURA ATUAL DO REPOSITÓRIO
 ============================================================
 
-cpp_mvp/
+cpp_pro/
   README.md
   index.html
   manifest.json
@@ -182,7 +182,7 @@ cpp_mvp/
 5. PAPEL DE CADA CAMADA
 ============================================================
 
-5.1 Frontend CPP
+5.1 Frontend cpp_pro
 
 Função:
 
@@ -389,7 +389,23 @@ Constatado:
 - a saída tocável permanece provisória e explicitamente marcada como tal.
 
 ============================================================
-9. ESTADO ATUAL DO PROJETO
+9. ATUALIZAÇÃO DE IDENTIDADE DO PROJETO
+============================================================
+
+Repositório renomeado manualmente para:
+
+cpp_pro
+
+Atualizações realizadas após renomeação:
+
+- manifest.json passou a usar nome e short_name cpp_pro;
+- index.html passou a exibir cpp_pro no title e no cabeçalho;
+- README.md passou a usar cpp_pro como nome oficial;
+- docker-compose.yml passou a usar serviço/container cpp-pro-backend;
+- este documento-mestre passou a registrar cpp_pro como identidade oficial do projeto.
+
+============================================================
+10. ESTADO ATUAL DO PROJETO
 ============================================================
 
 Concluído:
@@ -410,7 +426,8 @@ Concluído:
 - teste de backend sem Audiveris criado;
 - service worker atualizado;
 - documentação estrutural atualizada;
-- diretriz operacional permanente registrada neste documento.
+- diretriz operacional permanente registrada neste documento;
+- identidade oficial atualizada para cpp_pro.
 
 Pendente, somente após testes em terminal/CMD:
 
@@ -429,7 +446,7 @@ Pendente, somente após testes em terminal/CMD:
 - transformar cifra tocável provisória em cifra tocável final.
 
 ============================================================
-10. PRÓXIMO BLOCO DE TRABALHO
+11. PRÓXIMO BLOCO DE TRABALHO
 ============================================================
 
 As próximas auditorias confiáveis dependem de terminal/CMD:
@@ -454,7 +471,7 @@ Depois:
 uvicorn main:app --reload --host 0.0.0.0 --port 8787
 
 ============================================================
-11. REGRA DE OURO ATUAL
+12. REGRA DE OURO ATUAL
 ============================================================
 
 MusicXML estrutura.
@@ -462,7 +479,7 @@ OCR lê texto.
 Fusão relaciona.
 IA valida.
 Humano aprova.
-CPP exporta.
+cpp_pro exporta.
 
 Sucesso não significa 100% automático.
 
