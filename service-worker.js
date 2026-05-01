@@ -1,4 +1,4 @@
-const CACHE_NAME = "cpp-professional-omr-v1";
+const CACHE_NAME = "cpp-professional-omr-v2";
 
 const ASSETS = [
   "./",
@@ -14,6 +14,7 @@ const ASSETS = [
   "./src/modules/chord-sheet-technical.js",
   "./src/modules/chord-sheet-playable.js",
   "./src/modules/confidence-engine.js",
+  "./src/modules/navigation-engine.js",
   "./src/modules/export-output.js"
 ];
 
