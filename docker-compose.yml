@@ -1,9 +1,9 @@
 services:
-  cpp-backend:
+  cpp-pro-backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: cpp-backend
+    container_name: cpp-pro-backend
     ports:
       - "8787:8787"
     environment:
