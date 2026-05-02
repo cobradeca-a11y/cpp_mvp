@@ -927,3 +927,78 @@ Auditoria 19 — PDF controlado com Audiveris: aprovada.
 Próximo passo:
 
 Auditoria 20 — testar PDFs controlados adicionais ou iniciar o bloco OCR/fusão MusicXML + OCR.
+
+============================================================
+20. AUDITORIA 20 — PDFs CONTROLADOS ADICIONAIS
+============================================================
+
+Auditoria 20 — PDFs controlados adicionais com Audiveris
+
+Resultado: aprovada.
+
+Objetivo:
+
+Validar se o fluxo PDF → Audiveris → MusicXML → CPP permanece estável em mais de um arquivo controlado, além do BeetAnGeSample.pdf.
+
+Arquivos testados:
+
+1. MozaVeilSample.pdf
+2. MozaChloSample.pdf
+
+Resultado observado — MozaVeilSample.pdf:
+
+- Motor OMR: Audiveris/MusicXML;
+- Status OMR: success;
+- Arquivo: MozaVeilSample.pdf;
+- Tipo de arquivo: pdf;
+- Tom detectado: G;
+- Fórmula de compasso detectada: 2/4;
+- Compassos importados: 23;
+- Relatório de incertezas: nenhuma incerteza registrada;
+- Relatório de detecção: nenhuma pendência crítica registrada.
+
+Resultado observado — MozaChloSample.pdf:
+
+- Motor OMR: Audiveris/MusicXML;
+- Status OMR: success;
+- Arquivo: MozaChloSample.pdf;
+- Tipo de arquivo: pdf;
+- Tom detectado: Eb;
+- Fórmula de compasso detectada: 2/2;
+- Compassos importados: 18;
+- Relatório de incertezas: nenhuma incerteza registrada;
+- Relatório de detecção: nenhuma pendência crítica registrada.
+
+Comparação final do bloco PDF:
+
+- BeetAnGeSample.pdf → 15 compassos | Eb | 3/4;
+- MozaVeilSample.pdf → 23 compassos | G | 2/4;
+- MozaChloSample.pdf → 18 compassos | Eb | 2/2.
+
+Conclusão:
+
+O fluxo PDF → Audiveris → MusicXML → CPP permaneceu estável em três PDFs controlados.
+
+O CPP preservou:
+- quantidade de compassos;
+- tom;
+- fórmula de compasso;
+- status success;
+- relatórios sem pendência crítica;
+- relatórios de incerteza limpos.
+
+Observação importante:
+
+As cifras tocáveis permaneceram corretamente provisórias, porque OCR/fusão ainda não existem no pipeline.
+
+O app não fingiu alinhamento final sem OCR/fusão.
+
+Estado:
+
+Auditoria 19 — PDF Beet controlado: aprovada.
+Auditoria 20 — PDFs Moza controlados adicionais: aprovada.
+
+Próximo passo:
+
+Iniciar novo bloco técnico:
+Auditoria 21 — planejamento e implementação inicial do OCR/fusão MusicXML + OCR.
