@@ -5,9 +5,12 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-OCR_ENGINE_CMD = os.getenv("OCR_ENGINE_CMD", "").strip().strip('"')
 OCR_SUPPORTED_FILE_TYPES = {"pdf", "png", "jpg", "jpeg", "webp"}
 OCR_NOT_APPLICABLE_FILE_TYPES = {"xml", "musicxml", "mxl"}
+
+
+def configured_ocr_engine_cmd() -> str:
+    return os.getenv("OCR_ENGINE_CMD", "").strip().strip('"')
 
 
 def create_empty_ocr_contract(status: str = "pending", engine: str = "") -> dict[str, Any]:
@@ -45,17 +48,18 @@ def build_ocr_contract(source_path: str | Path | None = None, source_name: str =
         contract["warnings"].append(f"OCR não aplicável para o tipo de arquivo: {normalized_type or 'desconhecido'}.")
         return contract
 
-    if not OCR_ENGINE_CMD:
+    ocr_engine_cmd = configured_ocr_engine_cmd()
+    if not ocr_engine_cmd:
         contract = create_empty_ocr_contract(status="unavailable", engine="")
         contract["warnings"].append("OCR_ENGINE_CMD não configurado. OCR real ainda não foi executado.")
         return contract
 
-    if not ocr_engine_available(OCR_ENGINE_CMD):
-        contract = create_empty_ocr_contract(status="unavailable", engine=OCR_ENGINE_CMD)
+    if not ocr_engine_available(ocr_engine_cmd):
+        contract = create_empty_ocr_contract(status="unavailable", engine=ocr_engine_cmd)
         contract["warnings"].append("OCR_ENGINE_CMD configurado, mas o executável não está disponível neste ambiente.")
         return contract
 
-    contract = create_empty_ocr_contract(status="pending", engine=OCR_ENGINE_CMD)
+    contract = create_empty_ocr_contract(status="pending", engine=ocr_engine_cmd)
     contract["warnings"].append("Motor OCR disponível, mas execução real e fusão serão implementadas em auditoria posterior.")
     return contract
 
