@@ -1,7 +1,56 @@
+import io
+import zipfile
+
 from fastapi.testclient import TestClient
 
 import main
 from main import app
+
+MINIMAL_MUSICXML_NO_NAMESPACE = b'''<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <work><work-title>Teste sem namespace</work-title></work>
+  <part-list><score-part id="P1"><part-name>Voice</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>1</divisions>
+        <key><fifths>0</fifths></key>
+        <time><beats>3</beats><beat-type>4</beat-type></time>
+        <clef><sign>G</sign><line>2</line></clef>
+      </attributes>
+      <note>
+        <pitch><step>C</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <type>quarter</type>
+        <lyric><syllabic>single</syllabic><text>La</text></lyric>
+      </note>
+      <note><rest/><duration>1</duration><type>quarter</type></note>
+      <note>
+        <pitch><step>D</step><octave>4</octave></pitch>
+        <duration>1</duration>
+        <type>quarter</type>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+'''
+
+
+def make_minimal_mxl() -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(
+            "META-INF/container.xml",
+            '''<?xml version="1.0" encoding="UTF-8"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="score.musicxml" media-type="application/vnd.recordare.musicxml+xml"/>
+  </rootfiles>
+</container>
+''',
+        )
+        zf.writestr("score.musicxml", MINIMAL_MUSICXML_NO_NAMESPACE)
+    return buffer.getvalue()
 
 
 def test_health_endpoint():
@@ -43,3 +92,36 @@ def test_pdf_returns_professional_protocol_when_audiveris_unavailable(monkeypatc
         "detection_report",
     }
     assert data["navigation"]["status"] == "needs_review"
+
+
+def test_musicxml_without_namespace_imports_measures():
+    client = TestClient(app)
+    response = client.post(
+        "/api/omr/analyze",
+        files={"file": ("sample.musicxml", MINIMAL_MUSICXML_NO_NAMESPACE, "application/vnd.recordare.musicxml+xml")},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["source"]["file_type"] == "musicxml"
+    assert data["source"]["omr_status"] == "musicxml_parsed"
+    assert data["music"]["title"] == "Teste sem namespace"
+    assert data["music"]["meter_default"] == "3/4"
+    assert len(data["measures"]) == 1
+    assert data["measures"][0]["number"] == 1
+    assert data["measures"][0]["detected_elements"]["syllables"][0]["value"] == "La"
+
+
+def test_mxl_package_imports_measures():
+    client = TestClient(app)
+    response = client.post(
+        "/api/omr/analyze",
+        files={"file": ("sample.mxl", make_minimal_mxl(), "application/vnd.recordare.musicxml")},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["source"]["file_type"] == "mxl"
+    assert data["source"]["omr_status"] == "musicxml_parsed"
+    assert len(data["measures"]) == 1
+    assert data["systems"][0]["detected_summary"]["measure_count"] == 1
