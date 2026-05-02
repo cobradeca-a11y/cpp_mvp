@@ -57,6 +57,31 @@ function refreshReview() {
   $("measureFeedback").textContent = measureFeedback(currentMeasure());
 }
 
+function fileBaseName(fileName = "") {
+  return fileName.replace(/\.[^.]+$/, "").trim();
+}
+
+function detectedSummary() {
+  return protocol.systems?.[0]?.detected_summary || {};
+}
+
+function syncMusicMetadataFromImport(file) {
+  const summary = detectedSummary();
+  const importedTitle = protocol.music?.title?.trim();
+  const fileTitle = fileBaseName(file?.name || protocol.source?.file_name || "");
+
+  protocol.music ||= {};
+  protocol.music.title = importedTitle || fileTitle || "Sem título";
+  protocol.music.key = summary.key_signature || protocol.music.key || "";
+  protocol.music.meter_default = summary.meter || protocol.measures?.[0]?.meter || protocol.music.meter_default || "";
+  protocol.music.tempo = summary.tempo || protocol.music.tempo || "";
+
+  $("musicTitle").value = protocol.music.title || "";
+  $("musicKey").value = protocol.music.key || "";
+  $("meterDefault").value = protocol.music.meter_default || "";
+  $("tempo").value = protocol.music.tempo || "";
+}
+
 function applyUserMusicMetadata() {
   protocol.music ||= {};
   if ($("musicTitle").value.trim()) protocol.music.title = $("musicTitle").value.trim();
@@ -98,7 +123,7 @@ async function processWithProfessionalOmr() {
   try {
     const result = await analyzeWithProfessionalOmr({ file: selectedFile, backendUrl });
     protocol = result || createInitialProtocol();
-    applyUserMusicMetadata();
+    syncMusicMetadataFromImport(selectedFile);
     currentMeasureIndex = 0;
     persist();
 
@@ -125,8 +150,11 @@ function initEvents() {
     selectedFile = ev.target.files?.[0] || null;
     const valid = validateFile(selectedFile);
     $("fileInfo").textContent = selectedFile ? `${selectedFile.name} — ${valid.message}` : "Nenhum arquivo selecionado.";
-    if (selectedFile && !$("musicTitle").value.trim()) {
-      $("musicTitle").value = selectedFile.name.replace(/\.[^.]+$/, "");
+    if (selectedFile) {
+      $("musicTitle").value = fileBaseName(selectedFile.name);
+      $("musicKey").value = "";
+      $("meterDefault").value = "";
+      $("tempo").value = "";
     }
   };
 
@@ -177,13 +205,14 @@ function initEvents() {
     toast("Compasso marcado como incerto.");
   };
 
-  $("btnGenerateOutputs").onclick = generateOutputs;
-  $("btnExportJson").onclick = () => { generateOutputs(); downloadText(versioned("cpp_protocol", "json"), exportJson(protocol), "application/json;charset=utf-8"); };
-  $("btnExportTech").onclick = () => { generateOutputs(); downloadText(versioned("cifra_tecnica", "txt"), protocol.outputs.technical_chord_sheet); };
-  $("btnExportPlayable").onclick = () => { generateOutputs(); downloadText(versioned("cifra_tocavel", "txt"), protocol.outputs.playable_chord_sheet); };
-  $("btnExportUncertainty").onclick = () => { generateOutputs(); downloadText(versioned("relatorio_incertezas", "txt"), protocol.outputs.uncertainty_report); };
-  $("btnExportDetection").onclick = () => { generateOutputs(); downloadText(versioned("relatorio_deteccao", "txt"), protocol.outputs.detection_report); };
+  $("btnGenerateOutputs").onclick = () => { applyUserMusicMetadata(); generateOutputs(); };
+  $("btnExportJson").onclick = () => { applyUserMusicMetadata(); generateOutputs(); downloadText(versioned("cpp_protocol", "json"), exportJson(protocol), "application/json;charset=utf-8"); };
+  $("btnExportTech").onclick = () => { applyUserMusicMetadata(); generateOutputs(); downloadText(versioned("cifra_tecnica", "txt"), protocol.outputs.technical_chord_sheet); };
+  $("btnExportPlayable").onclick = () => { applyUserMusicMetadata(); generateOutputs(); downloadText(versioned("cifra_tocavel", "txt"), protocol.outputs.playable_chord_sheet); };
+  $("btnExportUncertainty").onclick = () => { applyUserMusicMetadata(); generateOutputs(); downloadText(versioned("relatorio_incertezas", "txt"), protocol.outputs.uncertainty_report); };
+  $("btnExportDetection").onclick = () => { applyUserMusicMetadata(); generateOutputs(); downloadText(versioned("relatorio_deteccao", "txt"), protocol.outputs.detection_report); };
   $("btnExportAll").onclick = () => {
+    applyUserMusicMetadata();
     generateOutputs();
     downloadText(versioned("cpp_protocol", "json"), exportJson(protocol), "application/json;charset=utf-8");
     downloadText(versioned("cifra_tecnica", "txt"), protocol.outputs.technical_chord_sheet);
