@@ -633,3 +633,99 @@ partitura processada
 + pendências apontadas
 + revisão humana reduzida
 + cifra final exportável.
+
+============================================================
+13. AUDITORIAS 9, 10 E 11 — PROCESSAMENTO CONTROLADO E REVISÃO
+============================================================
+
+Auditoria 9 — PDF → Audiveris → MusicXML com arquivo controlado
+
+Resultado: aprovada para PDF controlado.
+
+Validação executada:
+
+- Java 17 instalado e validado localmente;
+- Audiveris instalado em C:\Program Files\Audiveris\Audiveris.exe;
+- .env configurado com AUDIVERIS_CMD=C:\Program Files\Audiveris\Audiveris.exe;
+- backend /health retornou audiveris_available: true;
+- BeetAnGeSample.pdf foi processado pelo fluxo PDF → Audiveris → MusicXML;
+- frontend retornou Motor: Audiveris/MusicXML;
+- status retornou success;
+- Compassos importados: 15.
+
+Conclusão:
+
+- pipeline PDF → Audiveris real → MusicXML → parser CPP está funcional para amostra controlada;
+- o caso externo de PDF com contagem manual divergente fica fora desta sequência por enquanto.
+
+Auditoria 10 — inspeção do conteúdo importado
+
+Resultado: aprovada para estrutura MusicXML básica.
+
+Validação observada:
+
+- frontend exibiu compasso atual com origem musicxml;
+- fórmula de compasso 3/4 exibida;
+- tom/armadura Eb exibido na cifra técnica;
+- notas importadas por compasso exibidas;
+- pausas importadas por compasso exibidas;
+- relatório de detecção gerado;
+- relatório de incertezas gerado;
+- cifra técnica gerada;
+- cifra tocável provisória gerada com aviso correto.
+
+Limite registrado:
+
+- OCR ainda não configurado;
+- motor de fusão MusicXML + OCR ainda não executado;
+- cifras reais, sílabas complementares e alinhamento definitivo ainda dependem da fase OCR/fusão.
+
+Auditoria 11 — ação Aceitar leitura e relatório de incertezas
+
+Resultado: correção aplicada.
+
+Validação inicial:
+
+- ao clicar em Aceitar leitura no Compasso 1, review_status mudou de pending para approved;
+- measure-review.js já definia review_status = approved e review_required = false;
+- porém o relatório de incertezas continuava exibindo o compasso aprovado com a instrução 'Revisar leitura importada do MusicXML'.
+
+Diagnóstico:
+
+- confidence-engine.js listava compassos com confiança 'provável' no relatório mesmo quando review_status era approved e review_required era false;
+- a mensagem genérica de revisão era aplicada sem respeitar o estado aprovado pelo usuário.
+
+Correção aplicada:
+
+- globalUncertaintyReport passou a ignorar compassos approved quando review_required não é true;
+- foi criada regra explícita para status approved, pending e needs_fix;
+- compasso approved deixa de aparecer como pendência de incerteza;
+- caso um compasso approved seja forçado por alguma inconsistência futura com review_required true, a mensagem passa a ser 'Leitura aprovada pelo usuário', não 'Revisar leitura importada do MusicXML'.
+
+Critério de revalidação local:
+
+1. executar git pull origin main;
+2. recarregar o frontend sem cache;
+3. processar BeetAnGeSample.musicxml ou PDF controlado;
+4. aprovar o Compasso 1;
+5. gerar Relatório de incertezas;
+6. verificar que o Compasso 1 não aparece mais como pendência quando review_required=false.
+
+============================================================
+14. PRÓXIMO BLOCO DE TRABALHO
+============================================================
+
+Próxima auditoria recomendada:
+
+Auditoria 12 — Marcar incerto.
+
+Critério:
+
+- selecionar um compasso;
+- clicar em Marcar incerto;
+- confirmar review_status needs_fix;
+- confirmar confidence incerto;
+- confirmar review_required true;
+- gerar relatório de incertezas;
+- confirmar mensagem obrigatória de revisão;
+- exportar JSON e validar persistência do estado.
