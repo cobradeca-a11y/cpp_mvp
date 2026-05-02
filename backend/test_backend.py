@@ -8,10 +8,12 @@ from main import app
 
 MINIMAL_MUSICXML_NO_NAMESPACE = b'''<?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
+  <!-- regression: parser must ignore XML comments and non-element nodes -->
   <work><work-title>Teste sem namespace</work-title></work>
   <part-list><score-part id="P1"><part-name>Voice</part-name></score-part></part-list>
   <part id="P1">
     <measure number="1">
+      <!-- regression: comments inside measures must not break element scanning -->
       <attributes>
         <divisions>1</divisions>
         <key><fifths>0</fifths></key>
