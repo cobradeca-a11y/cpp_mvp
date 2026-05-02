@@ -851,3 +851,79 @@ Auditoria 18 — Reset/sincronização de metadados: aprovada.
 Próximo passo:
 
 Auditoria 19 — validar PDF controlado com Audiveris, usando um caso conhecido e comparável com MusicXML/MXL.
+
+============================================================
+19. AUDITORIA 19 — PDF CONTROLADO COM AUDIVERIS
+============================================================
+
+Auditoria 19 — PDF controlado com Audiveris
+
+Resultado: aprovada.
+
+Objetivo:
+
+Validar o fluxo completo:
+
+PDF → Audiveris → MusicXML → CPP → JSON / relatórios / cifras
+
+Arquivo testado:
+
+BeetAnGeSample.pdf
+
+Resultado observado:
+
+- Motor OMR: Audiveris/MusicXML;
+- Status OMR: success;
+- Arquivo: BeetAnGeSample.pdf;
+- Tipo de arquivo: pdf;
+- Tom detectado: Eb;
+- Fórmula de compasso detectada: 3/4;
+- Compassos importados: 15;
+- Relatório de incertezas: nenhuma incerteza registrada;
+- Relatório de detecção: nenhuma pendência crítica registrada.
+
+Comparação com arquivos já validados:
+
+- BeetAnGeSample.musicxml → 15 compassos;
+- BeetAnGeSample.mxl → 15 compassos;
+- BeetAnGeSample.pdf → 15 compassos.
+
+Conclusão:
+
+O fluxo PDF → Audiveris → MusicXML → CPP funcionou corretamente para o caso controlado BeetAnGeSample.pdf.
+
+A saída estrutural preservou:
+- quantidade de compassos;
+- tom;
+- fórmula de compasso;
+- status de importação;
+- ausência de pendências críticas.
+
+Observação importante:
+
+A cifra tocável permaneceu corretamente marcada como provisória, pois OCR/fusão ainda não foram implementados.
+
+O PDF via Audiveris, neste caso, não trouxe texto/letra/cifra complementar suficiente para alinhamento final. O app manteve o aviso profissional:
+
+"AVISO: cifra tocável provisória.
+Esta saída usa apenas relações já registradas no cpp_protocol.json.
+O alinhamento profissional definitivo depende do motor de fusão MusicXML + OCR.
+Ordem de execução não confirmada; usando ordem visual/importada."
+
+Critério aprovado:
+
+- backend utilizou Audiveris;
+- processamento retornou success;
+- CPP importou 15 compassos;
+- tom Eb foi preservado;
+- fórmula 3/4 foi preservada;
+- relatórios permaneceram limpos;
+- app não fingiu alinhamento final sem OCR/fusão.
+
+Estado:
+
+Auditoria 19 — PDF controlado com Audiveris: aprovada.
+
+Próximo passo:
+
+Auditoria 20 — testar PDFs controlados adicionais ou iniciar o bloco OCR/fusão MusicXML + OCR.
