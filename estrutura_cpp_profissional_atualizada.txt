@@ -1,0 +1,493 @@
+cpp_pro — CONVERSOR PROFISSIONAL DE PARTITURAS PEDAGÓGICAS
+ESTRUTURA CONSOLIDADA ATUALIZADA
+VERSÃO: PROFISSIONAL OMR + MUSICXML + OCR + VALIDAÇÃO
+STATUS: DOCUMENTO-MESTRE DO PROJETO
+
+============================================================
+0. DIRETRIZ OPERACIONAL PERMANENTE DO PROJETO
+============================================================
+
+A partir desta versão, todo trabalho no cpp_pro deve seguir padrão profissional.
+
+Regras permanentes:
+
+- tratar o projeto como produto profissional, não como experimento casual;
+- priorizar arquitetura limpa, rastreabilidade, testes e manutenção;
+- não criar placeholders inúteis;
+- não criar módulos de fachada;
+- não dizer que uma etapa está pronta antes de estar conectada ao fluxo real;
+- não voltar a usar heurísticas visuais como motor principal;
+- não transformar revisão humana em reconstrução manual da partitura;
+- sugerir sempre soluções de alto desempenho, alto controle e alta confiabilidade;
+- ao final de cada commit/deploy relevante, atualizar este arquivo com o que foi feito desde a última seção.
+
+Critério de entrada de qualquer novo módulo:
+
+1. função real;
+2. conexão clara com o fluxo profissional;
+3. entrada e saída definidas;
+4. erro controlado;
+5. compatibilidade com o cpp_protocol.json;
+6. documentação mínima no README ou neste documento;
+7. sem dependência oculta.
+
+============================================================
+1. DECISÃO ARQUITETURAL OFICIAL
+============================================================
+
+A estrutura semiautomática por sistema foi substituída.
+
+A arquitetura anterior era baseada em:
+
+- seleção manual de sistema;
+- geração de compassos por análise visual local;
+- detecção de barras por pixel/canvas;
+- análise automática/heurística por sistema;
+- detecção de acordes/letras por região visual simples;
+- alinhamento por distância horizontal;
+- revisão manual como complemento de um motor visual local.
+
+Essa abordagem não é mais o fluxo principal.
+
+A arquitetura oficial atual é:
+
+PDF / imagem
+↓
+OMR profissional
+↓
+MusicXML
+↓
+OCR profissional de texto/layout
+↓
+Motor de fusão estrutural
+↓
+cpp_protocol.json
+↓
+IA validadora
+↓
+Revisão humana orientada por pendências
+↓
+Exportação
+
+Regra central:
+
+O cpp_pro profissional não adivinha a música pela imagem.
+Ele processa por motores especializados, registra evidências, valida inconsistências e guia a revisão humana.
+
+============================================================
+2. OBJETIVO DO cpp_pro PROFISSIONAL
+============================================================
+
+Transformar partituras em PDF/imagem em cifra técnica e cifra tocável fiel, preservando:
+
+- estrutura musical;
+- compassos;
+- notas;
+- pausas;
+- durações;
+- fórmulas de compasso;
+- armadura;
+- navegação musical;
+- letras cantadas;
+- cifras/acordes escritos;
+- pontos incertos;
+- histórico de revisão;
+- relatório de detecção;
+- relatório de inconsistências.
+
+O cpp_pro não deve:
+
+- adivinhar harmonia;
+- rearmonizar;
+- simplificar acordes;
+- trocar acordes escritos por sugestões;
+- inventar cifra a partir de aparência visual;
+- tratar heurística local como fonte primária.
+
+O cpp_pro deve:
+
+- extrair estrutura musical por OMR/MusicXML;
+- extrair texto/layout por OCR profissional;
+- fundir as fontes em JSON estruturado;
+- validar inconsistências;
+- pedir revisão humana somente onde houver pendência;
+- exportar cifra técnica e cifra tocável.
+
+============================================================
+3. FONTES OFICIAIS DE EVIDÊNCIA
+============================================================
+
+Fontes válidas:
+
+- musicxml: dados vindos do OMR/MusicXML;
+- ocr: dados vindos do OCR profissional;
+- fusion: dados gerados pela fusão MusicXML + OCR;
+- ai_validation: inconsistências apontadas pela IA validadora;
+- human_review: correções confirmadas pelo usuário.
+
+Fontes proibidas como motor principal:
+
+- heuristic;
+- pixel_detection;
+- canvas_guess;
+- visual_region_guess;
+- blob_detection;
+- horizontal_distance_guess.
+
+============================================================
+4. ARQUITETURA ATUAL DO REPOSITÓRIO
+============================================================
+
+cpp_pro/
+  README.md
+  index.html
+  manifest.json
+  service-worker.js
+  docker-compose.yml
+  .env.example
+  estrutura_cpp_profissional_atualizada.txt
+
+  backend/
+    main.py
+    musicxml_parser.py
+    requirements.txt
+    README.md
+    Dockerfile
+    test_backend.py
+
+  docs/
+    CPP_PROTOCOL_PROFISSIONAL.md
+
+  scripts/
+    start-backend.sh
+    start-frontend.sh
+
+  src/
+    app.js
+    styles.css
+
+    modules/
+      cpp-json.js
+      file-input.js
+      professional-omr-client.js
+      feedback-engine.js
+      measure-review.js
+      chord-sheet-technical.js
+      chord-sheet-playable.js
+      confidence-engine.js
+      navigation-engine.js
+      export-output.js
+
+============================================================
+5. PAPEL DE CADA CAMADA
+============================================================
+
+5.1 Frontend cpp_pro
+
+Função:
+
+- receber arquivo do usuário;
+- configurar URL do backend;
+- verificar backend;
+- enviar arquivo para OMR profissional;
+- receber cpp_protocol.json;
+- listar compassos importados;
+- permitir revisão simples;
+- gerar saídas;
+- exportar arquivos.
+
+O frontend não deve conter motor visual local de leitura musical.
+
+5.2 Backend profissional
+
+Função:
+
+- receber PDF/imagem/MusicXML;
+- executar Audiveris quando a entrada for PDF/imagem;
+- obter MusicXML/MXL;
+- converter MusicXML para cpp_protocol.json;
+- retornar protocolo profissional mesmo quando Audiveris não estiver disponível;
+- futuramente executar OCR profissional;
+- futuramente executar motor de fusão;
+- futuramente executar IA validadora.
+
+5.3 Audiveris / OMR
+
+Papel:
+
+- ler partitura impressa ou escaneada;
+- reconhecer estrutura musical;
+- exportar MusicXML/MXL.
+
+Audiveris entrega estrutura musical. Ele não gera cifra final.
+
+5.4 Parser MusicXML
+
+Função:
+
+- extrair partes, compassos, notas, pausas, durações, fórmula de compasso, armadura, letras quando existirem e navegação quando existir;
+- não inventar dados ausentes;
+- retornar protocolo profissional completo;
+- registrar falhas como issues estruturadas.
+
+5.5 OCR profissional
+
+Fase pendente.
+
+Função futura:
+
+- ler acordes/cifras escritos;
+- ler letra cantada;
+- ler D.S., D.C., Coda, Fine, Al Coda;
+- ler andamento, título, textos editoriais e números de compasso úteis.
+
+Motores candidatos:
+
+- Google Document AI OCR;
+- Google Cloud Vision OCR.
+
+5.6 Motor de fusão estrutural
+
+Fase pendente.
+
+Função futura:
+
+- unir MusicXML + OCR;
+- relacionar compasso, tempo, nota/pausa, sílaba, acorde, navegação e incertezas;
+- marcar needs_review quando não houver evidência suficiente.
+
+5.7 IA validadora
+
+Fase pendente.
+
+Função futura:
+
+- auditar cpp_protocol.json;
+- apontar inconsistências;
+- devolver JSON estruturado;
+- nunca inventar acorde ou corrigir harmonia por gosto.
+
+5.8 Navigation Engine
+
+Função atual:
+
+- gerar ordem de execução a partir do protocolo quando a navegação já estiver resolvida;
+- usar ordem visual/importada apenas como fallback declarado;
+- marcar visual_only quando não houver resolução de D.S., D.C., Coda, Fine ou repetições.
+
+============================================================
+6. PROTOCOLO JSON PROFISSIONAL
+============================================================
+
+Estrutura base:
+
+{
+  "cpp_version": "professional-omr-1.0",
+  "source": {
+    "file_name": "",
+    "file_type": "pdf|image|musicxml|mxl",
+    "pages": 0,
+    "omr_status": "pending|success|failed|unavailable|musicxml_parsed",
+    "omr_engine": "Audiveris",
+    "ocr_status": "pending|success|failed|unavailable",
+    "ocr_engine": "",
+    "validation_status": "pending|passed|needs_review|failed",
+    "message": ""
+  },
+  "music": {
+    "title": "",
+    "key": "",
+    "meter_default": "",
+    "tempo": "",
+    "composer": "",
+    "arranger": ""
+  },
+  "pages": [],
+  "systems": [],
+  "measures": [],
+  "navigation": {
+    "visual_markers": [],
+    "execution_order": [],
+    "status": "visual_only|auto_resolved|manual_confirmed|needs_review"
+  },
+  "validation": {
+    "validation_status": "pending|passed|needs_review|failed",
+    "overall_confidence": 0,
+    "issues": []
+  },
+  "review": [],
+  "outputs": {
+    "technical_chord_sheet": "",
+    "playable_chord_sheet": "",
+    "uncertainty_report": "",
+    "detection_report": ""
+  }
+}
+
+============================================================
+7. ESTADO DAS SAÍDAS
+============================================================
+
+7.1 Cifra técnica
+
+A cifra técnica nasce do cpp_protocol.json e serve como relatório de conferência.
+
+7.2 Cifra tocável
+
+Estado atual: provisória.
+
+A cifra tocável atual:
+
+- usa apenas relações já registradas no protocolo;
+- não posiciona acordes por coordenada visual;
+- declara que o alinhamento definitivo depende do motor de fusão MusicXML + OCR.
+
+A cifra tocável final só deve ser considerada profissional após existir fusion engine validado.
+
+============================================================
+8. AUDITORIAS REALIZADAS
+============================================================
+
+Auditoria 1 — estrutura e inconsistências iniciais
+
+Resultado: correções aplicadas.
+
+Foi corrigido:
+
+- cpp-json.js passou para STORAGE_KEY profissional;
+- cpp_version passou para professional-omr-1.0;
+- ui_state/undo_stack saíram do protocolo base;
+- service-worker incluiu navigation-engine.js;
+- feedback-engine passou a usar linguagem de evidências profissionais;
+- chord-sheet-playable foi travado como saída provisória;
+- backend/main.py passou a normalizar protocolo profissional também quando Audiveris não está disponível;
+- estrutura_cpp_profissional_atualizada.txt passou a registrar navigation-engine e status provisório da cifra tocável.
+
+Auditoria 2 — backend coerente sem Audiveris instalado
+
+Resultado: correções aplicadas.
+
+Foi corrigido:
+
+- musicxml_parser.py passou a retornar protocolo profissional completo;
+- parser removeu system_analysis legado;
+- parser passou a incluir ocr_status, ocr_engine, validation_status e validation;
+- parser passou a registrar falhas de parsing como issue estruturada;
+- test_backend.py passou a testar PDF sem Audiveris;
+- teste valida omr_status unavailable, ocr_status pending, validation_status pending, outputs e navigation.status needs_review.
+
+Auditoria 3 — frontend chama apenas o fluxo profissional
+
+Resultado: aprovado em auditoria estática.
+
+Constatado:
+
+- app.js importa apenas módulos compatíveis com o fluxo profissional;
+- app.js chama analyzeWithProfessionalOmr e checkProfessionalOmrBackend;
+- não há importação dos módulos antigos measure-generator, system-analyzer, pdf-renderer, page-viewer, system-marker ou preprocessing;
+- buscas por termos antigos/heurísticos não retornaram ocorrências relevantes no repositório atual;
+- a saída tocável permanece provisória e explicitamente marcada como tal.
+
+============================================================
+9. ATUALIZAÇÃO DE IDENTIDADE DO PROJETO
+============================================================
+
+Repositório renomeado manualmente para:
+
+cpp_pro
+
+Atualizações realizadas após renomeação:
+
+- manifest.json passou a usar nome e short_name cpp_pro;
+- index.html passou a exibir cpp_pro no title e no cabeçalho;
+- README.md passou a usar cpp_pro como nome oficial;
+- docker-compose.yml passou a usar serviço/container cpp-pro-backend;
+- este documento-mestre passou a registrar cpp_pro como identidade oficial do projeto.
+
+============================================================
+10. ESTADO ATUAL DO PROJETO
+============================================================
+
+Concluído:
+
+- virada arquitetural para fluxo profissional;
+- remoção do fluxo principal baseado em heurísticas;
+- protocolo profissional oficial criado;
+- README profissional criado;
+- backend FastAPI iniciado;
+- parser MusicXML conservador iniciado;
+- cliente frontend para OMR profissional criado;
+- frontend reorganizado para fluxo profissional;
+- Dockerfile do backend criado;
+- docker-compose criado;
+- .env.example criado;
+- scripts de start criados;
+- teste básico do backend criado;
+- teste de backend sem Audiveris criado;
+- service worker atualizado;
+- documentação estrutural atualizada;
+- diretriz operacional permanente registrada neste documento;
+- identidade oficial atualizada para cpp_pro.
+
+Pendente, somente após testes em terminal/CMD:
+
+- rodar pytest;
+- subir backend com uvicorn;
+- validar /health real;
+- abrir frontend localmente;
+- testar botão Verificar backend;
+- testar upload MusicXML direto;
+- instalar/configurar Audiveris;
+- testar PDF → Audiveris → MusicXML;
+- evoluir parser MusicXML com casos reais;
+- integrar OCR profissional;
+- criar fusion engine;
+- criar IA validadora estruturada;
+- transformar cifra tocável provisória em cifra tocável final.
+
+============================================================
+11. PRÓXIMO BLOCO DE TRABALHO
+============================================================
+
+As próximas auditorias confiáveis dependem de terminal/CMD:
+
+1. Auditoria 4 — protocolo JSON bate com parser MusicXML em execução real.
+2. Auditoria 5 — backend sobe sem quebrar.
+3. Auditoria 6 — frontend abre sem erro.
+4. Auditoria 7 — botão Verificar backend funciona.
+5. Auditoria 8 — upload MusicXML direto funciona.
+6. Auditoria 9 — PDF → Audiveris → MusicXML.
+
+Primeiros comandos previstos:
+
+cd backend
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+pytest
+
+Depois:
+
+uvicorn main:app --reload --host 0.0.0.0 --port 8787
+
+============================================================
+12. REGRA DE OURO ATUAL
+============================================================
+
+MusicXML estrutura.
+OCR lê texto.
+Fusão relaciona.
+IA valida.
+Humano aprova.
+cpp_pro exporta.
+
+Sucesso não significa 100% automático.
+
+Sucesso significa:
+
+partitura processada
++ estrutura musical extraída
++ texto/cifra capturados
++ pendências apontadas
++ revisão humana reduzida
++ cifra final exportável.

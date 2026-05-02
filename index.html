@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+  <meta name="theme-color" content="#111827" />
+  <title>cpp_pro — Conversor Profissional de Partituras</title>
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="stylesheet" href="./src/styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <h1>cpp_pro</h1>
+      <p>Conversor Profissional de Partituras — OMR, MusicXML, Revisão e Cifra Tocável</p>
+    </div>
+  </header>
+
+  <main class="professional-main">
+    <section class="panel active">
+      <h2>1. Processamento profissional</h2>
+      <p class="hint">Fluxo principal: PDF/imagem → OMR profissional → MusicXML → CPP JSON → revisão → cifra.</p>
+
+      <div class="card">
+        <label>Backend OMR
+          <input id="backendUrl" value="http://localhost:8787" placeholder="http://localhost:8787" />
+        </label>
+        <div class="toolbar">
+          <button id="btnCheckBackend" class="ghost">Verificar backend</button>
+        </div>
+        <pre id="backendStatus" class="report small-report">Backend ainda não verificado.</pre>
+      </div>
+
+      <div class="card">
+        <input id="fileInput" type="file" accept=".pdf,.musicxml,.xml,image/png,image/jpeg,image/webp" />
+        <div id="fileInfo" class="info"></div>
+        <div class="grid2">
+          <label>Título <input id="musicTitle" placeholder="Título da música" /></label>
+          <label>Tom <input id="musicKey" placeholder="Ex.: D, G, C" /></label>
+          <label>Compasso padrão <input id="meterDefault" placeholder="Ex.: 3/4" value="3/4" /></label>
+          <label>Andamento <input id="tempo" placeholder="Ex.: ♩ = 75-85" /></label>
+        </div>
+        <button id="btnProfessionalOmr" class="primary full">Processar com OMR Profissional</button>
+      </div>
+
+      <div class="card">
+        <h3>Status do processamento</h3>
+        <pre id="processingStatus" class="report">Aguardando arquivo.</pre>
+      </div>
+    </section>
+
+    <section class="panel active">
+      <h2>2. Revisão</h2>
+      <p class="hint">A revisão parte do JSON gerado pelo OMR/MusicXML. Correções manuais servem apenas para ajustar o resultado estrutural.</p>
+
+      <div class="toolbar sticky">
+        <button id="btnPrevMeasure">Compasso anterior</button>
+        <button id="btnAcceptMeasure" class="ok">Aceitar leitura</button>
+        <button id="btnMarkUncertain" class="warn">Marcar incerto</button>
+        <button id="btnNextMeasure">Próximo compasso</button>
+      </div>
+
+      <div class="layout">
+        <div class="card">
+          <h3>Compasso atual</h3>
+          <pre id="measureFeedback" class="report">Nenhum compasso carregado.</pre>
+        </div>
+        <aside class="side">
+          <h3>Compassos importados</h3>
+          <div id="measuresList" class="list"></div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="panel active">
+      <h2>3. Saída</h2>
+      <div class="toolbar sticky">
+        <button id="btnGenerateOutputs" class="primary">Gerar saídas</button>
+        <button id="btnExportJson">Exportar JSON</button>
+        <button id="btnExportTech">Exportar cifra técnica</button>
+        <button id="btnExportPlayable">Exportar cifra tocável</button>
+        <button id="btnExportUncertainty">Exportar incertezas</button>
+        <button id="btnExportDetection">Exportar detecção</button>
+        <button id="btnExportAll" class="ok">Exportar pacote</button>
+      </div>
+
+      <div class="grid2">
+        <div class="card"><h3>Cifra técnica</h3><pre id="technicalOutput" class="output"></pre></div>
+        <div class="card"><h3>Cifra tocável</h3><pre id="playableOutput" class="output"></pre></div>
+        <div class="card"><h3>Relatório de incertezas</h3><pre id="uncertaintyOutput" class="output"></pre></div>
+        <div class="card"><h3>Relatório de detecção</h3><pre id="detectionOutput" class="output"></pre></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>
