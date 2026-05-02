@@ -163,6 +163,7 @@ function initEvents() {
     acceptMeasure(m);
     persist();
     refreshReview();
+    generateOutputs();
     toast("Compasso aprovado.");
   };
 
@@ -172,11 +173,12 @@ function initEvents() {
     markMeasureUncertain(m);
     persist();
     refreshReview();
+    generateOutputs();
     toast("Compasso marcado como incerto.");
   };
 
   $("btnGenerateOutputs").onclick = generateOutputs;
-  $("btnExportJson").onclick = () => downloadText(versioned("cpp_protocol", "json"), exportJson(protocol), "application/json;charset=utf-8");
+  $("btnExportJson").onclick = () => { generateOutputs(); downloadText(versioned("cpp_protocol", "json"), exportJson(protocol), "application/json;charset=utf-8"); };
   $("btnExportTech").onclick = () => { generateOutputs(); downloadText(versioned("cifra_tecnica", "txt"), protocol.outputs.technical_chord_sheet); };
   $("btnExportPlayable").onclick = () => { generateOutputs(); downloadText(versioned("cifra_tocavel", "txt"), protocol.outputs.playable_chord_sheet); };
   $("btnExportUncertainty").onclick = () => { generateOutputs(); downloadText(versioned("relatorio_incertezas", "txt"), protocol.outputs.uncertainty_report); };
