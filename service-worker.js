@@ -1,4 +1,4 @@
-const CACHE_NAME = "cpp-professional-omr-v2";
+const CACHE_NAME = "cpp-professional-omr-v3-audit16";
 
 const ASSETS = [
   "./",
@@ -30,11 +30,39 @@ self.addEventListener("activate", event => {
   self.clients.claim();
 });
 
+async function networkFirst(request) {
+  const cache = await caches.open(CACHE_NAME);
+  try {
+    const response = await fetch(request, { cache: "no-store" });
+    if (response && response.ok) {
+      cache.put(request, response.clone());
+    }
+    return response;
+  } catch (error) {
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    throw error;
+  }
+}
+
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
 
   const url = new URL(event.request.url);
   if (url.pathname.includes("/api/omr/") || url.pathname.endsWith("/health")) return;
+
+  const destination = event.request.destination;
+  const isFrontendAsset = ["document", "script", "style", "manifest"].includes(destination)
+    || url.pathname.endsWith(".js")
+    || url.pathname.endsWith(".css")
+    || url.pathname.endsWith(".html")
+    || url.pathname.endsWith("/manifest.json")
+    || url.pathname === "/";
+
+  if (isFrontendAsset) {
+    event.respondWith(networkFirst(event.request));
+    return;
+  }
 
   event.respondWith(
     caches.match(event.request).then(cached => cached || fetch(event.request).catch(() => cached))
