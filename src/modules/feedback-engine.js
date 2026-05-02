@@ -1,3 +1,30 @@
+function pendingReason(measure) {
+  const reviewStatus = measure.review_status || "pending";
+  const confidence = measure.confidence || "provável";
+
+  if (["incerto", "ilegível"].includes(confidence)) {
+    return `revisão por baixa confiança (${confidence})`;
+  }
+
+  if (reviewStatus === "needs_fix") {
+    return "revisão obrigatória marcada pelo usuário";
+  }
+
+  if (reviewStatus === "approved" && measure.review_required !== true) {
+    return "";
+  }
+
+  if (reviewStatus === "pending") {
+    return `revisão pendente (${confidence})`;
+  }
+
+  if (measure.review_required === true) {
+    return `revisão necessária (${confidence})`;
+  }
+
+  return "";
+}
+
 export function systemFeedback(protocol, systemId) {
   const system = protocol.systems.find(s => s.system_id === systemId);
   if (!system) return "Nenhum sistema selecionado/importado.";
@@ -39,9 +66,14 @@ export function systemFeedback(protocol, systemId) {
 
   lines.push("");
   lines.push("Pendências:");
-  const pend = measures.filter(m => m.review_required || m.confidence !== "certo");
+  const pend = measures
+    .map(m => ({ measure: m, reason: pendingReason(m) }))
+    .filter(item => item.reason);
+
   if (!pend.length) lines.push("- Nenhuma pendência crítica registrada.");
-  for (const m of pend) lines.push(`- Compasso ${m.number}: revisar (${m.confidence || "provável"})`);
+  for (const item of pend) {
+    lines.push(`- Compasso ${item.measure.number}: ${item.reason}`);
+  }
   if (s.warnings?.length) s.warnings.forEach(w => lines.push(`- ${w}`));
 
   return lines.join("\n");
