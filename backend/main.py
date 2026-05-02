@@ -53,12 +53,17 @@ async def analyze_omr(file: UploadFile = File(...)) -> JSONResponse:
 
         if suffix in {".xml", ".musicxml", ".mxl"}:
             protocol = parse_musicxml_to_cpp(source, source_name=file.filename)
-            return JSONResponse(normalize_professional_protocol(protocol, file.filename, file_type="musicxml", omr_status="musicxml_parsed"))
+            return JSONResponse(normalize_professional_protocol(
+                protocol,
+                file.filename,
+                file_type=input_file_type(suffix),
+                omr_status=protocol.get("source", {}).get("omr_status", "musicxml_parsed"),
+            ))
 
         if not audiveris_available():
             return JSONResponse(make_base_protocol(
                 filename=file.filename,
-                file_type=suffix.replace(".", ""),
+                file_type=input_file_type(suffix),
                 omr_status="unavailable",
                 message="Audiveris não está disponível neste ambiente. Instale/configure AUDIVERIS_CMD para executar OMR profissional."
             ))
@@ -67,7 +72,7 @@ async def analyze_omr(file: UploadFile = File(...)) -> JSONResponse:
         if not musicxml or not musicxml.exists():
             return JSONResponse(make_base_protocol(
                 filename=file.filename,
-                file_type=suffix.replace(".", ""),
+                file_type=input_file_type(suffix),
                 omr_status="failed",
                 message="Audiveris executou, mas não gerou MusicXML/MXL identificável."
             ))
@@ -76,9 +81,14 @@ async def analyze_omr(file: UploadFile = File(...)) -> JSONResponse:
         return JSONResponse(normalize_professional_protocol(
             protocol,
             file.filename,
-            file_type=suffix.replace(".", ""),
+            file_type=input_file_type(suffix),
             omr_status="success"
         ))
+
+
+def input_file_type(suffix: str) -> str:
+    cleaned = suffix.lower().replace(".", "")
+    return "musicxml" if cleaned == "xml" else cleaned
 
 
 def audiveris_available() -> bool:
@@ -130,7 +140,7 @@ def make_base_protocol(filename: str, file_type: str = "", omr_status: str = "pe
         "cpp_version": "professional-omr-1.0",
         "source": {
             "file_name": filename,
-            "file_type": file_type or Path(filename).suffix.replace(".", ""),
+            "file_type": file_type or input_file_type(Path(filename).suffix),
             "pages": 0,
             "omr_status": omr_status,
             "omr_engine": "Audiveris",
