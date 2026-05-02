@@ -424,6 +424,47 @@ Conclusão:
 - configuração AUDIVERIS_CMD está legível;
 - Audiveris ainda não está configurado no ambiente local, o que é esperado nesta fase.
 
+Auditoria 6 — frontend abre sem erro
+
+Resultado: aprovado em execução real.
+
+Validação executada:
+
+- frontend servido localmente em http://localhost:8080;
+- tela principal abriu no navegador;
+- cabeçalho exibiu cpp_pro;
+- campo Backend OMR carregou http://localhost:8787;
+- fluxo visual principal carregou sem quebra aparente.
+
+Conclusão:
+
+- frontend local está servindo;
+- index.html, CSS e app.js carregaram de forma funcional;
+- interface principal está acessível para teste manual.
+
+Auditoria 7 — botão Verificar backend funciona
+
+Resultado: aprovado em execução real.
+
+Validação executada:
+
+- botão Verificar backend acionado no frontend local;
+- frontend consultou o backend em http://localhost:8787;
+- resposta exibida na interface:
+
+{
+  "ok": true,
+  "app": "CPP Professional OMR Backend",
+  "audiveris_cmd": "audiveris",
+  "audiveris_available": false
+}
+
+Conclusão:
+
+- frontend está comunicando com backend;
+- fluxo básico navegador → FastAPI está funcional;
+- ausência do Audiveris está corretamente sinalizada e não quebra o sistema.
+
 ============================================================
 9. ATUALIZAÇÃO DE IDENTIDADE DO PROJETO
 ============================================================
@@ -466,12 +507,12 @@ Concluído:
 - identidade oficial atualizada para cpp_pro;
 - pasta local conectada e sincronizada ao GitHub;
 - pytest do backend aprovado com 2 testes;
-- backend FastAPI validado via /health.
+- backend FastAPI validado via /health;
+- frontend local validado em localhost:8080;
+- comunicação frontend → backend validada.
 
 Pendente:
 
-- abrir frontend localmente;
-- testar botão Verificar backend;
 - testar upload MusicXML direto;
 - instalar/configurar Audiveris;
 - testar PDF → Audiveris → MusicXML;
@@ -487,22 +528,24 @@ Pendente:
 
 Próximas auditorias:
 
-1. Auditoria 6 — frontend abre sem erro.
-2. Auditoria 7 — botão Verificar backend funciona.
-3. Auditoria 8 — upload MusicXML direto funciona.
-4. Auditoria 9 — PDF → Audiveris → MusicXML.
+1. Auditoria 8 — upload MusicXML direto funciona.
+2. Auditoria 9 — PDF → Audiveris → MusicXML.
 
-Próximo comando previsto em outro terminal, na raiz do projeto:
+Próximo teste recomendado:
 
-python -m http.server 8080
+- selecionar um arquivo .musicxml ou .xml válido no frontend;
+- clicar em Processar com OMR Profissional;
+- confirmar se o backend retorna cpp_protocol.json;
+- confirmar se o frontend lista compassos importados;
+- confirmar se relatórios são gerados.
 
-Depois acessar:
-
-http://localhost:8080
-
-Com o backend ainda rodando em:
+Com backend ainda rodando em:
 
 http://localhost:8787
+
+E frontend ainda rodando em:
+
+http://localhost:8080
 
 ============================================================
 12. REGRA DE OURO ATUAL
