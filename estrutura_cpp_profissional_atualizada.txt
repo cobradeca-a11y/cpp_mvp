@@ -1002,3 +1002,141 @@ Próximo passo:
 
 Iniciar novo bloco técnico:
 Auditoria 21 — planejamento e implementação inicial do OCR/fusão MusicXML + OCR.
+
+============================================================
+21. AUDITORIA 21 — CONTRATO REAL DO OCR
+============================================================
+
+Auditoria 21 — contrato real do OCR
+
+Resultado: aprovada.
+
+Objetivo:
+
+Criar a primeira camada formal e auditável de OCR no cpp_pro, sem OCR fake, sem heurística como motor principal e sem fusão prematura com MusicXML.
+
+Commits funcionais aplicados:
+
+- 2116ff9 Add OCR contract engine for audit 21
+- 3b94185 Integrate OCR contract into backend protocol
+- 53368c8 Test OCR contract layer for audit 21
+- 1ab703d Read OCR engine command after environment load
+
+Arquivos alterados:
+
+- backend/ocr_engine.py
+- backend/main.py
+- backend/test_backend.py
+
+Implementação:
+
+Foi criado o módulo backend/ocr_engine.py com contrato explícito de OCR:
+
+{
+  "status": "pending | unavailable | success | failed | not_applicable",
+  "engine": "",
+  "text_blocks": [],
+  "possible_chords": [],
+  "possible_lyrics": [],
+  "warnings": []
+}
+
+Regras implementadas:
+
+- MusicXML/MXL não executa OCR;
+- MusicXML/MXL retorna ocr.status = not_applicable;
+- PDF/imagem sem OCR_ENGINE_CMD configurado retorna ocr.status = unavailable;
+- source.ocr_status espelha protocol["ocr"].status;
+- source.ocr_engine espelha protocol["ocr"].engine;
+- OCR não altera measures;
+- OCR não altera tom;
+- OCR não altera fórmula de compasso;
+- OCR não altera notas;
+- OCR não altera pausas;
+- OCR não altera revisão humana;
+- OCR não cria texto, cifra ou letra fictícia;
+- fusão MusicXML + OCR permanece pendente para auditoria futura.
+
+Testes executados:
+
+Localmente, em:
+
+C:\HomeCloud\shared\Projetos\cpp_pro\backend
+
+Comando:
+
+pytest
+
+Resultado:
+
+4 passed in 0.51s
+
+Validação funcional — MusicXML:
+
+Arquivo testado:
+
+MozaVeilSample.musicxml
+
+Resultado:
+
+- Status OMR: musicxml_parsed;
+- Motor OMR: Audiveris/MusicXML;
+- Status OCR: not_applicable;
+- Motor OCR: não configurado;
+- Tom: G;
+- Fórmula de compasso: 2/4;
+- Compassos importados: 23;
+- Relatório de incertezas: nenhuma incerteza registrada;
+- Relatório de detecção: nenhuma pendência crítica registrada.
+
+Critério aprovado para MusicXML:
+
+- OCR não tentou processar MusicXML/MXL;
+- OCR foi marcado como não aplicável;
+- estrutura musical permaneceu vinda do MusicXML;
+- texto/letra existente no MusicXML foi preservado como evidência estrutural;
+- sem fusão OCR.
+
+Validação funcional — PDF:
+
+Arquivo testado:
+
+MozaChloSample.pdf
+
+Resultado:
+
+- Status OMR: success;
+- Motor OMR: Audiveris/MusicXML;
+- Status OCR: unavailable;
+- Motor OCR: não configurado;
+- Tom: Eb;
+- Fórmula de compasso: 2/2;
+- Compassos importados: 18;
+- Relatório de incertezas: nenhuma incerteza registrada;
+- Relatório de detecção: nenhuma pendência crítica registrada.
+
+Critério aprovado para PDF:
+
+- Audiveris continuou executando o fluxo PDF → MusicXML;
+- OCR foi marcado como unavailable por ausência de OCR_ENGINE_CMD;
+- nenhum texto, cifra ou letra foi inventado;
+- measures permaneceram derivados do MusicXML gerado pelo Audiveris;
+- tom, fórmula de compasso, notas e pausas não foram alterados pelo OCR;
+- cifra tocável permaneceu corretamente provisória.
+
+Conclusão:
+
+A Auditoria 21 está aprovada.
+
+O cpp_pro agora possui uma camada formal de contrato OCR, conectada ao protocolo profissional, testada no backend e validada funcionalmente no app.
+
+Estado:
+
+Auditoria 21 — contrato real do OCR: aprovada.
+
+Próximo passo:
+
+Auditoria 22 — escolher e configurar motor OCR real, mantendo a regra:
+OCR lê texto/layout; MusicXML estrutura; fusão relaciona; humano aprova.
+
+
