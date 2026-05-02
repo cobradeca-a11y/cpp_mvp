@@ -7,14 +7,19 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from musicxml_parser import parse_musicxml_to_cpp
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+load_dotenv(PROJECT_ROOT / ".env")
+load_dotenv(Path(__file__).resolve().parent / ".env")
+
 APP_NAME = "CPP Professional OMR Backend"
-AUDIVERIS_CMD = os.getenv("AUDIVERIS_CMD", "audiveris")
+AUDIVERIS_CMD = os.getenv("AUDIVERIS_CMD", "audiveris").strip().strip('"')
 
 app = FastAPI(title=APP_NAME, version="professional-omr-1.0")
 
