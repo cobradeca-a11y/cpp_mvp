@@ -388,6 +388,42 @@ Constatado:
 - buscas por termos antigos/heurísticos não retornaram ocorrências relevantes no repositório atual;
 - a saída tocável permanece provisória e explicitamente marcada como tal.
 
+Auditoria 4 — testes reais do backend
+
+Resultado: aprovado em terminal/CMD.
+
+Validação executada:
+
+- ambiente Python virtual criado localmente;
+- dependências instaladas via requirements.txt;
+- pytest executado no backend;
+- resultado informado: 2 passed.
+
+Conclusão:
+
+- teste do endpoint /health aprovado;
+- teste de PDF sem Audiveris aprovado;
+- backend retorna protocolo profissional controlado mesmo quando Audiveris não está disponível.
+
+Auditoria 5 — backend sobe sem quebrar
+
+Resultado: aprovado em execução real.
+
+Validação executada:
+
+- backend iniciado com uvicorn em localhost:8787;
+- endpoint http://localhost:8787/health aberto no navegador;
+- resposta recebida:
+
+{"ok":true,"app":"CPP Professional OMR Backend","audiveris_cmd":"audiveris","audiveris_available":false}
+
+Conclusão:
+
+- backend está vivo;
+- FastAPI respondeu corretamente;
+- configuração AUDIVERIS_CMD está legível;
+- Audiveris ainda não está configurado no ambiente local, o que é esperado nesta fase.
+
 ============================================================
 9. ATUALIZAÇÃO DE IDENTIDADE DO PROJETO
 ============================================================
@@ -427,13 +463,13 @@ Concluído:
 - service worker atualizado;
 - documentação estrutural atualizada;
 - diretriz operacional permanente registrada neste documento;
-- identidade oficial atualizada para cpp_pro.
+- identidade oficial atualizada para cpp_pro;
+- pasta local conectada e sincronizada ao GitHub;
+- pytest do backend aprovado com 2 testes;
+- backend FastAPI validado via /health.
 
-Pendente, somente após testes em terminal/CMD:
+Pendente:
 
-- rodar pytest;
-- subir backend com uvicorn;
-- validar /health real;
 - abrir frontend localmente;
 - testar botão Verificar backend;
 - testar upload MusicXML direto;
@@ -449,26 +485,24 @@ Pendente, somente após testes em terminal/CMD:
 11. PRÓXIMO BLOCO DE TRABALHO
 ============================================================
 
-As próximas auditorias confiáveis dependem de terminal/CMD:
+Próximas auditorias:
 
-1. Auditoria 4 — protocolo JSON bate com parser MusicXML em execução real.
-2. Auditoria 5 — backend sobe sem quebrar.
-3. Auditoria 6 — frontend abre sem erro.
-4. Auditoria 7 — botão Verificar backend funciona.
-5. Auditoria 8 — upload MusicXML direto funciona.
-6. Auditoria 9 — PDF → Audiveris → MusicXML.
+1. Auditoria 6 — frontend abre sem erro.
+2. Auditoria 7 — botão Verificar backend funciona.
+3. Auditoria 8 — upload MusicXML direto funciona.
+4. Auditoria 9 — PDF → Audiveris → MusicXML.
 
-Primeiros comandos previstos:
+Próximo comando previsto em outro terminal, na raiz do projeto:
 
-cd backend
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-pytest
+python -m http.server 8080
 
-Depois:
+Depois acessar:
 
-uvicorn main:app --reload --host 0.0.0.0 --port 8787
+http://localhost:8080
+
+Com o backend ainda rodando em:
+
+http://localhost:8787
 
 ============================================================
 12. REGRA DE OURO ATUAL
