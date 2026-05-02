@@ -729,3 +729,47 @@ Critério:
 - gerar relatório de incertezas;
 - confirmar mensagem obrigatória de revisão;
 - exportar JSON e validar persistência do estado.
+
+============================================================
+15. AUDITORIA 13 — PERSISTÊNCIA E EXPORTAÇÃO JSON DA REVISÃO
+============================================================
+
+Auditoria 13 — Persistência e exportação JSON da revisão
+
+Resultado: correções aplicadas; aguardando revalidação local final.
+
+Achado inicial:
+
+- o JSON exportado preservava corretamente o estado atual em measures;
+- Compasso 1 era exportado com review_status approved e review_required false;
+- Compasso 2 era exportado com review_status needs_fix, review_required true e confidence incerto;
+- porém outputs.uncertainty_report e outputs.detection_report podiam permanecer desatualizados;
+- o relatório de detecção ainda listava compassos aprovados como pendências.
+
+Correções aplicadas:
+
+- feedback-engine.js passou a classificar pendências por regra explícita;
+- approved + review_required=false deixa de aparecer em Pendências;
+- needs_fix entra como revisão obrigatória;
+- pending entra como revisão pendente;
+- incerto/ilegível entra por baixa confiança;
+- app.js passou a regenerar outputs antes de Exportar JSON;
+- app.js passou a regenerar outputs após Aceitar leitura;
+- app.js passou a regenerar outputs após Marcar incerto.
+
+Critério de revalidação:
+
+1. processar BeetAnGeSample.musicxml;
+2. aprovar Compasso 1;
+3. marcar Compasso 2 como incerto;
+4. exportar JSON;
+5. confirmar que measures preserva os estados atuais;
+6. confirmar que outputs.uncertainty_report não lista Compasso 1;
+7. confirmar que outputs.uncertainty_report lista Compasso 2 como needs_fix/incerto;
+8. confirmar que outputs.detection_report não lista Compasso 1 em Pendências;
+9. confirmar que outputs.detection_report lista Compasso 2 como revisão obrigatória.
+
+Próximo passo:
+
+- revalidar localmente a Auditoria 13;
+- se aprovada, avançar para Auditoria 14.
