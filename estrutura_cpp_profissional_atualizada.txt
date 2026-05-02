@@ -773,3 +773,81 @@ Próximo passo:
 
 - revalidar localmente a Auditoria 13;
 - se aprovada, avançar para Auditoria 14.
+
+============================================================
+18. AUDITORIA 18 — RESET E SINCRONIZAÇÃO DE METADADOS
+============================================================
+
+Auditoria 18 — Reset/sincronização de metadados ao processar novo arquivo
+
+Resultado: aprovada.
+
+Achado:
+
+Após processar arquivos diferentes em sequência, o CPP não herdava compassos, revisões ou relatórios críticos do arquivo anterior, mas alguns metadados globais permaneciam contaminados pelos campos manuais da tela.
+
+Casos observados:
+
+1. MozaChloSample.musicxml
+- fórmula detectada correta: 2/2;
+- tom detectado correto: Eb;
+- compassos importados: 18;
+- porém music.meter_default ainda podia permanecer como 3/4 antes da correção.
+
+2. MozaVeilSample.musicxml
+- arquivo importado corretamente: MozaVeilSample.musicxml;
+- fórmula detectada correta: 2/4;
+- tom detectado correto: G;
+- compassos importados: 23;
+- porém title e outputs ainda podiam carregar MozaChloSample antes da correção.
+
+Correção aplicada:
+
+Commit funcional:
+167391c Reset imported metadata for new files
+
+Alterações realizadas em src/app.js:
+
+- ao selecionar novo arquivo, o título da tela passa a ser o nome do novo arquivo;
+- tom, compasso padrão e andamento são limpos;
+- ao processar OMR, os metadados são sincronizados a partir do MusicXML/importação;
+- music.title passa a vir do protocolo importado ou do nome do arquivo;
+- music.key passa a vir de detected_summary.key_signature;
+- music.meter_default passa a vir de detected_summary.meter ou do primeiro compasso;
+- music.tempo passa a vir de detected_summary.tempo quando existir;
+- outputs passam a ser regenerados com os metadados corretos do novo arquivo.
+
+Revalidação:
+
+MozaVeilSample.musicxml:
+- music.title: Das Veilchen (Page 1);
+- music.key: G;
+- music.meter_default: 2/4;
+- detected_summary.meter: 2/4;
+- measure_count: 23;
+- cifra técnica: Das Veilchen (Page 1), Tom G, Compasso padrão 2/4.
+
+MozaChloSample.musicxml:
+- music.title: An Chloe (Page 1);
+- music.key: Eb;
+- music.meter_default: 2/2;
+- detected_summary.meter: 2/2;
+- measure_count: 18;
+- cifra técnica: An Chloe (Page 1), Tom Eb, Compasso padrão 2/2.
+
+Critério aprovado:
+
+- novo arquivo não herda metadados antigos;
+- novo arquivo não herda compassos antigos;
+- novo arquivo não herda revisão antiga;
+- outputs usam título, tom e compasso do arquivo atual;
+- relatórios permanecem limpos quando todos os compassos estão aprovados.
+
+Estado:
+
+Auditoria 17 — Reset / novo arquivo: aprovada.
+Auditoria 18 — Reset/sincronização de metadados: aprovada.
+
+Próximo passo:
+
+Auditoria 19 — validar PDF controlado com Audiveris, usando um caso conhecido e comparável com MusicXML/MXL.
