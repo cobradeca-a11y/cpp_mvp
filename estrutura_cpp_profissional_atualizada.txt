@@ -229,6 +229,7 @@ Função:
 - suportar MusicXML com namespace XML;
 - suportar MusicXML sem namespace XML;
 - suportar MXL compactado com container.xml;
+- ignorar nós XML não-elemento, como comentários;
 - não inventar dados ausentes;
 - retornar protocolo profissional completo;
 - registrar falhas como issues estruturadas.
@@ -468,38 +469,44 @@ Conclusão:
 - fluxo básico navegador → FastAPI está funcional;
 - ausência do Audiveris está corretamente sinalizada e não quebra o sistema.
 
-Auditoria 8 — upload MusicXML direto
+Auditoria 8 — upload MusicXML/MXL direto
 
-Resultado parcial: falha funcional identificada e correção aplicada no repositório.
+Resultado: aprovado para entrada estrutural nativa.
 
-Validação executada:
+Validação inicial:
 
 - arquivo BeetAnGeSample.musicxml foi enviado pelo frontend;
 - backend aceitou o arquivo;
 - processamento retornou Motor: Audiveris/MusicXML;
 - status retornou musicxml_parsed;
-- porém Compassos importados retornou 0.
+- primeira execução retornou Compassos importados: 0.
 
-Diagnóstico:
+Diagnóstico da falha inicial:
 
 - o arquivo MusicXML enviado estava em formato sem namespace XML;
 - o parser anterior buscava elementos usando namespace MusicXML fixo;
 - por isso o arquivo era lido, mas <part> e <measure> não eram encontrados.
 
-Correção aplicada:
+Correções aplicadas:
 
 - musicxml_parser.py foi reescrito para buscar elementos por local-name, funcionando com MusicXML com namespace e sem namespace;
 - suporte real a .mxl compactado foi adicionado com leitura de META-INF/container.xml;
+- parser passou a ignorar nós XML não-elemento, como comentários;
 - main.py passou a preservar file_type correto para musicxml e mxl;
-- test_backend.py recebeu testes de regressão para MusicXML sem namespace e MXL compactado.
+- test_backend.py recebeu testes de regressão para MusicXML sem namespace, MXL compactado e comentários XML.
 
-Estado:
+Validação após correções:
 
-- correção está no GitHub;
-- falta atualizar a pasta local via git pull;
-- falta reiniciar o backend;
-- falta rodar pytest novamente;
-- falta repetir o upload BeetAnGeSample.musicxml e BeetAnGeSample.mxl.
+- BeetAnGeSample.musicxml importou 15 compassos;
+- BeetAnGeSample.mxl apresentou o mesmo resultado;
+- compasso 1 exibiu 3/4, texto/letra registrado, notas importadas e pausas importadas;
+- frontend listou compassos importados para revisão.
+
+Conclusão:
+
+- entrada .musicxml está funcional;
+- entrada .mxl está funcional;
+- parser estrutural nativo está apto para próximos testes com amostras reais adicionais.
 
 ============================================================
 9. ATUALIZAÇÃO DE IDENTIDADE DO PROJETO
@@ -548,20 +555,23 @@ Concluído:
 - comunicação frontend → backend validada;
 - parser MusicXML corrigido para namespace/no-namespace;
 - parser MXL compactado implementado;
-- testes de regressão adicionados para MusicXML e MXL.
+- parser passou a tolerar comentários XML e nós não-elemento;
+- testes de regressão adicionados para MusicXML e MXL;
+- upload .musicxml validado com 15 compassos importados;
+- upload .mxl validado com 15 compassos importados;
+- Java 17 instalado e validado localmente;
+- Audiveris instalado localmente em C:\Program Files\Audiveris\Audiveris.exe;
+- backend atualizado para carregar AUDIVERIS_CMD via .env.
 
 Pendente imediato:
 
-- git pull local;
+- confirmar .env local apontando para C:\Program Files\Audiveris\Audiveris.exe;
 - reiniciar backend;
-- rodar pytest novamente;
-- repetir upload BeetAnGeSample.musicxml;
-- repetir upload BeetAnGeSample.mxl.
+- confirmar /health com audiveris_available: true;
+- testar PDF → Audiveris → MusicXML.
 
 Pendente posterior:
 
-- instalar/configurar Audiveris;
-- testar PDF → Audiveris → MusicXML;
 - evoluir parser MusicXML com casos reais;
 - integrar OCR profissional;
 - criar fusion engine;
@@ -576,18 +586,31 @@ Próximos comandos locais:
 
 git pull origin main
 cd backend
+pip install -r requirements.txt
 pytest
+
+Configurar .env na raiz:
+
+AUDIVERIS_CMD=C:\Program Files\Audiveris\Audiveris.exe
 
 Depois reiniciar backend:
 
 uvicorn main:app --reload --host 0.0.0.0 --port 8787
 
-Depois repetir no frontend:
+Conferir:
 
-1. selecionar BeetAnGeSample.musicxml;
+http://localhost:8787/health
+
+Objetivo:
+
+"audiveris_available": true
+
+Depois testar no frontend:
+
+1. selecionar BeetAnGeSample.pdf;
 2. clicar em Processar com OMR Profissional;
-3. conferir Compassos importados;
-4. repetir com BeetAnGeSample.mxl.
+3. verificar se Audiveris gera MusicXML;
+4. verificar se o parser importa compassos do resultado.
 
 ============================================================
 12. REGRA DE OURO ATUAL
