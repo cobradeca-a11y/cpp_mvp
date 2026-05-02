@@ -6,12 +6,19 @@ from typing import Any
 from lxml import etree
 
 
+def is_element_node(node: Any) -> bool:
+    return isinstance(getattr(node, "tag", None), str)
+
+
 def local_name(node: etree._Element) -> str:
-    return etree.QName(node).localname
+    tag = getattr(node, "tag", "")
+    if not isinstance(tag, str):
+        return ""
+    return etree.QName(tag).localname
 
 
 def children(node: etree._Element, name: str) -> list[etree._Element]:
-    return [child for child in node if local_name(child) == name]
+    return [child for child in node if is_element_node(child) and local_name(child) == name]
 
 
 def first_child(node: etree._Element, name: str) -> etree._Element | None:
@@ -20,7 +27,7 @@ def first_child(node: etree._Element, name: str) -> etree._Element | None:
 
 
 def descendants(node: etree._Element, name: str) -> list[etree._Element]:
-    return node.xpath(f".//*[local-name()='{name}']")
+    return [item for item in node.iter() if is_element_node(item) and local_name(item) == name and item is not node]
 
 
 def first_descendant_text(node: etree._Element, name: str, default: str = "") -> str:
@@ -45,6 +52,10 @@ def nested_text(node: etree._Element, path: list[str], default: str = "") -> str
             return default
         current = next_node
     return "".join(current.itertext()).strip() or default
+
+
+def element_children(node: etree._Element) -> list[etree._Element]:
+    return [child for child in node if is_element_node(child)]
 
 
 def create_empty_professional_protocol(source_name: str = "") -> dict[str, Any]:
@@ -177,7 +188,7 @@ def parse_musicxml_to_cpp(musicxml_path: str | Path, source_name: str = "") -> d
 
         cursor_div = 0
         marker_index = 1
-        for child in measure:
+        for child in element_children(measure):
             tag = local_name(child)
             if tag == "harmony":
                 chord_value = harmony_to_chord(child)
@@ -291,7 +302,7 @@ def rootfile_from_container(zf: zipfile.ZipFile) -> str | None:
     except KeyError:
         return None
     root = etree.fromstring(data)
-    rootfiles = root.xpath(".//*[local-name()='rootfile']")
+    rootfiles = [item for item in root.iter() if is_element_node(item) and local_name(item) == "rootfile"]
     for item in rootfiles:
         full_path = item.get("full-path")
         if full_path:
@@ -453,7 +464,7 @@ def fifths_to_key(fifths: str) -> str:
 
 
 def detect_navigation(node: etree._Element) -> str:
-    text = " ".join("".join(x.itertext()).strip() for x in node.iter() if x.text).strip()
+    text = " ".join("".join(x.itertext()).strip() for x in node.iter() if is_element_node(x) and x.text).strip()
     lower = text.lower()
     if "fine" in lower:
         return "Fine"
