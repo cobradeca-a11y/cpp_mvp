@@ -45,30 +45,57 @@ export function scoreSystemConfidence(protocol, systemId) {
   }
 }
 
+function shouldReportMeasureUncertainty(measure) {
+  const reviewStatus = measure.review_status || "pending";
+  if (reviewStatus === "approved" && measure.review_required !== true) return false;
+
+  return (
+    measure.review_required === true ||
+    ["provável", "incerto", "ilegível"].includes(measure.confidence) ||
+    reviewStatus === "needs_fix"
+  );
+}
+
+function appendReviewInstruction(lines, measure) {
+  const reviewStatus = measure.review_status || "pending";
+
+  if (reviewStatus === "approved") {
+    lines.push("- Leitura aprovada pelo usuário.");
+    return;
+  }
+
+  if (reviewStatus === "needs_fix") {
+    lines.push("- Compasso marcado como incerto pelo usuário. Revisão obrigatória antes da exportação final.");
+    return;
+  }
+
+  lines.push("- Revisar leitura importada do MusicXML.");
+}
+
 export function globalUncertaintyReport(protocol) {
   const lines = ["RELATÓRIO DE INCERTEZAS", ""];
 
   for (const measure of protocol.measures || []) {
-    if (measure.review_required || ["provável", "incerto", "ilegível"].includes(measure.confidence)) {
-      lines.push(`Compasso ${measure.number}: ${measure.confidence || "provável"}`);
-      lines.push(`Status de revisão: ${measure.review_status || "pending"}`);
+    if (!shouldReportMeasureUncertainty(measure)) continue;
 
-      if (measure.alignments?.length) {
-        measure.alignments.forEach(alignment => {
-          lines.push(`- Alinhamento ${alignment.alignment_type}: ${alignment.confidence || "provável"} (${alignment.source || "musicxml"})`);
-        });
-      }
+    lines.push(`Compasso ${measure.number}: ${measure.confidence || "provável"}`);
+    lines.push(`Status de revisão: ${measure.review_status || "pending"}`);
 
-      (measure.alignment_warnings || []).forEach(warning => {
-        lines.push(`- ${warning.message || warning.type}`);
+    if (measure.alignments?.length) {
+      measure.alignments.forEach(alignment => {
+        lines.push(`- Alinhamento ${alignment.alignment_type}: ${alignment.confidence || "provável"} (${alignment.source || "musicxml"})`);
       });
-
-      if (!measure.alignments?.length && !measure.alignment_warnings?.length) {
-        lines.push("- Revisar leitura importada do MusicXML.");
-      }
-
-      lines.push("");
     }
+
+    (measure.alignment_warnings || []).forEach(warning => {
+      lines.push(`- ${warning.message || warning.type}`);
+    });
+
+    if (!measure.alignments?.length && !measure.alignment_warnings?.length) {
+      appendReviewInstruction(lines, measure);
+    }
+
+    lines.push("");
   }
 
   if (lines.length === 2) lines.push("Nenhuma incerteza registrada.");
