@@ -55,6 +55,17 @@ def make_minimal_mxl() -> bytes:
     return buffer.getvalue()
 
 
+def assert_ocr_contract(data, expected_status):
+    assert "ocr" in data
+    assert data["ocr"]["status"] == expected_status
+    assert data["source"]["ocr_status"] == expected_status
+    assert data["source"]["ocr_engine"] == data["ocr"]["engine"]
+    assert isinstance(data["ocr"]["text_blocks"], list)
+    assert isinstance(data["ocr"]["possible_chords"], list)
+    assert isinstance(data["ocr"]["possible_lyrics"], list)
+    assert isinstance(data["ocr"]["warnings"], list)
+
+
 def test_health_endpoint():
     client = TestClient(app)
     response = client.get("/health")
@@ -82,8 +93,12 @@ def test_pdf_returns_professional_protocol_when_audiveris_unavailable(monkeypatc
     assert data["source"]["file_type"] == "pdf"
     assert data["source"]["omr_status"] == "unavailable"
     assert data["source"]["omr_engine"] == "Audiveris"
-    assert data["source"]["ocr_status"] == "pending"
     assert data["source"]["validation_status"] == "pending"
+    assert_ocr_contract(data, "unavailable")
+    assert data["ocr"]["text_blocks"] == []
+    assert data["ocr"]["possible_chords"] == []
+    assert data["ocr"]["possible_lyrics"] == []
+    assert data["measures"] == []
     assert "validation" in data
     assert data["validation"]["validation_status"] == "pending"
     assert "outputs" in data
@@ -107,6 +122,7 @@ def test_musicxml_without_namespace_imports_measures():
     data = response.json()
     assert data["source"]["file_type"] == "musicxml"
     assert data["source"]["omr_status"] == "musicxml_parsed"
+    assert_ocr_contract(data, "not_applicable")
     assert data["music"]["title"] == "Teste sem namespace"
     assert data["music"]["meter_default"] == "3/4"
     assert len(data["measures"]) == 1
@@ -125,5 +141,6 @@ def test_mxl_package_imports_measures():
     data = response.json()
     assert data["source"]["file_type"] == "mxl"
     assert data["source"]["omr_status"] == "musicxml_parsed"
+    assert_ocr_contract(data, "not_applicable")
     assert len(data["measures"]) == 1
     assert data["systems"][0]["detected_summary"]["measure_count"] == 1
