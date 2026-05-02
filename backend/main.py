@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from musicxml_parser import parse_musicxml_to_cpp
+from ocr_engine import build_ocr_contract, sync_ocr_contract
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(PROJECT_ROOT / ".env")
@@ -51,43 +52,51 @@ async def analyze_omr(file: UploadFile = File(...)) -> JSONResponse:
     if suffix not in {".pdf", ".png", ".jpg", ".jpeg", ".webp", ".xml", ".musicxml", ".mxl"}:
         raise HTTPException(status_code=400, detail="Formato não aceito. Use PDF, imagem ou MusicXML/MXL.")
 
+    file_type = input_file_type(suffix)
+
     with tempfile.TemporaryDirectory(prefix="cpp_omr_") as tmp:
         tmpdir = Path(tmp)
         source = tmpdir / sanitize_filename(file.filename)
         source.write_bytes(await file.read())
+        ocr_contract = build_ocr_contract(source_path=source, source_name=file.filename, file_type=file_type)
 
         if suffix in {".xml", ".musicxml", ".mxl"}:
             protocol = parse_musicxml_to_cpp(source, source_name=file.filename)
-            return JSONResponse(normalize_professional_protocol(
+            normalized = normalize_professional_protocol(
                 protocol,
                 file.filename,
-                file_type=input_file_type(suffix),
+                file_type=file_type,
                 omr_status=protocol.get("source", {}).get("omr_status", "musicxml_parsed"),
-            ))
+                ocr_contract=ocr_contract,
+            )
+            return JSONResponse(normalized)
 
         if not audiveris_available():
             return JSONResponse(make_base_protocol(
                 filename=file.filename,
-                file_type=input_file_type(suffix),
+                file_type=file_type,
                 omr_status="unavailable",
-                message="Audiveris não está disponível neste ambiente. Instale/configure AUDIVERIS_CMD para executar OMR profissional."
+                message="Audiveris não está disponível neste ambiente. Instale/configure AUDIVERIS_CMD para executar OMR profissional.",
+                ocr_contract=ocr_contract,
             ))
 
         musicxml = run_audiveris(source, tmpdir)
         if not musicxml or not musicxml.exists():
             return JSONResponse(make_base_protocol(
                 filename=file.filename,
-                file_type=input_file_type(suffix),
+                file_type=file_type,
                 omr_status="failed",
-                message="Audiveris executou, mas não gerou MusicXML/MXL identificável."
+                message="Audiveris executou, mas não gerou MusicXML/MXL identificável.",
+                ocr_contract=ocr_contract,
             ))
 
         protocol = parse_musicxml_to_cpp(musicxml, source_name=file.filename)
         return JSONResponse(normalize_professional_protocol(
             protocol,
             file.filename,
-            file_type=input_file_type(suffix),
-            omr_status="success"
+            file_type=file_type,
+            omr_status="success",
+            ocr_contract=ocr_contract,
         ))
 
 
@@ -140,8 +149,14 @@ def sanitize_filename(name: str) -> str:
     return safe or "upload.pdf"
 
 
-def make_base_protocol(filename: str, file_type: str = "", omr_status: str = "pending", message: str = "") -> dict[str, Any]:
-    return {
+def make_base_protocol(
+    filename: str,
+    file_type: str = "",
+    omr_status: str = "pending",
+    message: str = "",
+    ocr_contract: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    protocol = {
         "cpp_version": "professional-omr-1.0",
         "source": {
             "file_name": filename,
@@ -175,18 +190,23 @@ def make_base_protocol(filename: str, file_type: str = "", omr_status: str = "pe
             "detection_report": "",
         },
     }
+    return sync_ocr_contract(protocol, ocr_contract or build_ocr_contract(source_name=filename, file_type=protocol["source"]["file_type"]))
 
 
-def normalize_professional_protocol(protocol: dict[str, Any], filename: str, file_type: str, omr_status: str) -> dict[str, Any]:
-    base = make_base_protocol(filename=filename, file_type=file_type, omr_status=omr_status)
+def normalize_professional_protocol(
+    protocol: dict[str, Any],
+    filename: str,
+    file_type: str,
+    omr_status: str,
+    ocr_contract: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    base = make_base_protocol(filename=filename, file_type=file_type, omr_status=omr_status, ocr_contract=ocr_contract)
     merged = {**base, **(protocol or {})}
     merged["cpp_version"] = "professional-omr-1.0"
     merged["source"] = {**base["source"], **(protocol.get("source", {}) if protocol else {})}
     merged["source"]["file_name"] = filename
     merged["source"]["file_type"] = file_type
     merged["source"]["omr_status"] = omr_status
-    merged["source"].setdefault("ocr_status", "pending")
-    merged["source"].setdefault("ocr_engine", "")
     merged["source"].setdefault("validation_status", "pending")
     merged["music"] = {**base["music"], **(protocol.get("music", {}) if protocol else {})}
     merged["navigation"] = {**base["navigation"], **(protocol.get("navigation", {}) if protocol else {})}
@@ -196,4 +216,4 @@ def normalize_professional_protocol(protocol: dict[str, Any], filename: str, fil
     merged.setdefault("systems", [])
     merged.setdefault("measures", [])
     merged.setdefault("review", [])
-    return merged
+    return sync_ocr_contract(merged, ocr_contract or merged.get("ocr") or base.get("ocr"))
