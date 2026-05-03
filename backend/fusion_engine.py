@@ -259,9 +259,9 @@ def normalize_ocr_evidence(text: str, classification: str) -> dict[str, Any]:
             "normalization_notes": notes + ["symbol_noise_not_used_as_text"],
         }
 
-    if classification in {"possible_lyric", "lyric_syllable_fragment"}:
-        lyric_text = strip_outer_punctuation(normalized)
-        lyric_text = normalize_german_sharp_s(lyric_text)
+    lyric_probe = strip_outer_punctuation(normalized)
+    if classification in {"possible_lyric", "lyric_syllable_fragment"} or is_likely_normalized_lyric_candidate(lyric_probe):
+        lyric_text = normalize_german_sharp_s(lyric_probe)
         if lyric_text != normalized:
             notes.append("lyric_text_cleaned")
         return {
@@ -292,6 +292,13 @@ def normalize_ocr_evidence(text: str, classification: str) -> dict[str, Any]:
         "normalization_status": "preserved_unclassified",
         "normalization_notes": notes,
     }
+
+
+def is_likely_normalized_lyric_candidate(text: str) -> bool:
+    cleaned = normalize_token(text)
+    if cleaned in SHORT_LYRIC_WORDS:
+        return True
+    return is_likely_lyric_word(text, cleaned) or is_likely_lyric_fragment(text, cleaned)
 
 
 def normalize_quotes_and_dashes(text: str) -> str:
