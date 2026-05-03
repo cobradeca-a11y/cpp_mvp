@@ -73,9 +73,10 @@ MUSIC_SYMBOL_NOISE_TOKENS = {"។", "·", "•", "*"}
 def build_initial_fusion(protocol: dict[str, Any]) -> dict[str, Any]:
     """Build a conservative MusicXML + OCR evidence index.
 
-    Audit 26.1 still does not align text to systems or measures. It only
-    classifies OCR blocks and groups nearby OCR blocks into visual text lines
-    for human review. Every musical/spatial assignment remains pending.
+    Audit 27 groups OCR visual lines into functional evidence regions such as
+    instrument, lyric, chord, editorial, noise, and unknown. It still does not
+    align text to systems or measures. Every musical/spatial assignment remains
+    pending for human review.
     """
     ocr = protocol.get("ocr") or {}
     source = protocol.get("source") or {}
@@ -86,7 +87,7 @@ def build_initial_fusion(protocol: dict[str, Any]) -> dict[str, Any]:
     fusion = {
         "status": "not_applicable",
         "engine": "initial_musicxml_ocr_fusion",
-        "version": "audit-26.1",
+        "version": "audit-27",
         "inputs": {
             "omr_status": source.get("omr_status", ""),
             "ocr_status": ocr.get("status", source.get("ocr_status", "")),
@@ -96,7 +97,9 @@ def build_initial_fusion(protocol: dict[str, Any]) -> dict[str, Any]:
         },
         "text_blocks_index": [],
         "text_line_groups": [],
+        "text_region_groups": [],
         "classification_counts": {},
+        "region_counts": {},
         "possible_chords": [],
         "possible_lyrics": [],
         "possible_navigation": [],
@@ -154,6 +157,8 @@ def build_initial_fusion(protocol: dict[str, Any]) -> dict[str, Any]:
 
     fusion["classification_counts"] = dict(sorted(classification_counts.items()))
     fusion["text_line_groups"] = group_ocr_blocks_by_visual_line(fusion["text_blocks_index"])
+    fusion["text_region_groups"] = group_text_lines_by_functional_region(fusion["text_line_groups"])
+    fusion["region_counts"] = count_regions(fusion["text_region_groups"])
     return fusion
 
 
@@ -351,6 +356,59 @@ def group_ocr_blocks_by_visual_line(indexed_blocks: list[dict[str, Any]]) -> lis
         })
 
     return line_groups
+
+
+def group_text_lines_by_functional_region(text_line_groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    region_groups = []
+    for idx, line in enumerate(text_line_groups, start=1):
+        region = classify_text_line_region(line)
+        region_groups.append({
+            "region_id": f"fr{idx:04d}",
+            "region_type": region["region_type"],
+            "confidence": region["confidence"],
+            "reason": region["reason"],
+            "page": line.get("page", 1),
+            "line_ids": [line["line_id"]],
+            "text": line.get("text", ""),
+            "classifications": line.get("classifications", {}),
+            "bbox": line.get("bbox", {}),
+            "assignment": pending_assignment(),
+        })
+    return region_groups
+
+
+def classify_text_line_region(line: dict[str, Any]) -> dict[str, str]:
+    classifications = line.get("classifications", {}) or {}
+    text = str(line.get("text", "")).strip()
+    total = sum(int(value) for value in classifications.values()) or 1
+
+    instrument_score = classifications.get("instrument_label", 0) / total
+    lyric_score = (classifications.get("possible_lyric", 0) + classifications.get("lyric_syllable_fragment", 0)) / total
+    chord_score = classifications.get("possible_chord", 0) / total
+    editorial_score = (classifications.get("editorial_text", 0) + classifications.get("possible_navigation", 0)) / total
+    noise_score = (
+        classifications.get("punctuation", 0)
+        + classifications.get("music_symbol_noise", 0)
+        + classifications.get("lyric_hyphen_or_continuation", 0)
+    ) / total
+
+    if instrument_score >= 0.5:
+        return {"region_type": "instrument_region", "confidence": "conservative", "reason": "predominant_instrument_labels"}
+    if chord_score >= 0.5:
+        return {"region_type": "chord_region", "confidence": "conservative", "reason": "predominant_possible_chords"}
+    if lyric_score >= 0.5:
+        return {"region_type": "lyric_region", "confidence": "conservative", "reason": "predominant_lyric_text_or_fragments"}
+    if editorial_score >= 0.5:
+        return {"region_type": "editorial_region", "confidence": "conservative", "reason": "predominant_editorial_or_navigation_text"}
+    if noise_score >= 0.5:
+        return {"region_type": "noise_region", "confidence": "conservative", "reason": "predominant_punctuation_or_noise"}
+    if text:
+        return {"region_type": "unknown_text_region", "confidence": "low", "reason": "mixed_or_insufficient_evidence"}
+    return {"region_type": "unknown_region", "confidence": "low", "reason": "empty_or_unclassified_line"}
+
+
+def count_regions(region_groups: list[dict[str, Any]]) -> dict[str, int]:
+    return dict(sorted(Counter(region["region_type"] for region in region_groups).items()))
 
 
 def bbox_bounds(bbox: Any) -> tuple[float, float, float, float] | None:
