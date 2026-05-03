@@ -8,7 +8,7 @@ import { generatePlayableChordSheet } from "./modules/chord-sheet-playable.js";
 import { globalUncertaintyReport } from "./modules/confidence-engine.js";
 import { downloadText, versioned } from "./modules/export-output.js";
 
-const FRONTEND_BUILD = "audit-37-cache-v1";
+const FRONTEND_BUILD = "audit-38-cache-v1";
 
 let protocol = loadProtocol();
 let selectedFile = null;
@@ -97,9 +97,7 @@ function buildProcessingSummary(protocol) {
   if (fusion.version) lines.push(`Versão Fusion: ${fusion.version}`);
   if (layout.version) lines.push(`Layout: ${layout.version} — ${layout.status || "not_available"}`);
   if (alignment.version) lines.push(`Relatório de alinhamento: ${alignment.version} — ${alignment.status || "not_available"}`);
-  if (possibleChords || possibleLyrics) {
-    lines.push(`Candidatos OCR: ${possibleChords} cifra(s), ${possibleLyrics} texto(s)/sílaba(s).`);
-  }
+  if (possibleChords || possibleLyrics) lines.push(`Candidatos OCR: ${possibleChords} cifra(s), ${possibleLyrics} texto(s)/sílaba(s).`);
   lines.push(...formatClassificationCounts(fusion));
   if (fusion.warnings?.length) {
     lines.push("Avisos Fusion:");
@@ -258,40 +256,95 @@ function makeSystemReviewDecision(block, decision) {
   toast(decision === "confirmed" ? "Estado OCR→sistema confirmado." : "Estado OCR→sistema rejeitado.");
 }
 
+function makeMeasureReviewDecision(block, decision) {
+  const region = findRegionForBlock(block);
+  const measureAssociation = findMeasureAssociation(region);
+  const reviewedAt = new Date().toISOString();
+  const review = {
+    review_id: `ocr-measure-${block.fusion_id}-${Date.now()}`,
+    audit: "audit-38",
+    type: "ocr_measure_association_review",
+    target_type: "fusion_text_region",
+    target_id: region?.region_id || null,
+    source_block_id: block.fusion_id,
+    decision,
+    original_text: block.text,
+    normalized_text: block.normalized_text,
+    original_region_type: region?.region_type || null,
+    original_association_status: measureAssociation?.association_status || null,
+    original_candidate_system_id: measureAssociation?.candidate_system_id || null,
+    original_candidate_measure_id: measureAssociation?.candidate_measure_id || null,
+    original_candidate_measure_number: measureAssociation?.candidate_measure_number || null,
+    original_confidence_score: measureAssociation?.confidence_score ?? null,
+    original_confidence_level: measureAssociation?.confidence_level || null,
+    original_reason: measureAssociation?.reason || null,
+    reviewed_by: "human_local_review",
+    reviewed_at: reviewedAt,
+    effects: {
+      text_changed: false,
+      normalized_text_changed: false,
+      classification_changed: false,
+      system_assignment_changed: false,
+      measure_assignment_changed: false,
+      candidate_system_id_changed: false,
+      candidate_measure_id_changed: false,
+      candidate_measure_number_changed: false,
+      confidence_score_changed: false,
+    },
+  };
+
+  ensureReviewArray();
+  protocol.review.push(review);
+  block.measure_human_review = {
+    status: decision === "confirmed" ? "measure_state_confirmed" : "measure_state_rejected",
+    decision,
+    reviewed_at: reviewedAt,
+    review_id: review.review_id,
+    association_status_reviewed: measureAssociation?.association_status || null,
+    candidate_measure_id_preserved: measureAssociation?.candidate_measure_id || null,
+    candidate_measure_number_preserved: measureAssociation?.candidate_measure_number || null,
+    confidence_score_preserved: measureAssociation?.confidence_score ?? null,
+  };
+  persist();
+  refreshOcrReview();
+  generateOutputs();
+  toast(decision === "confirmed" ? "Estado OCR→compasso confirmado." : "Estado OCR→compasso rejeitado.");
+}
+
 function approveCurrentOcrClassification() {
   const block = currentOcrBlock();
-  if (!block) {
-    toast("Nenhum bloco OCR para aprovar.");
-    return;
-  }
+  if (!block) return toast("Nenhum bloco OCR para aprovar.");
   makeHumanReviewDecision(block, "approved");
 }
 
 function rejectCurrentOcrClassification() {
   const block = currentOcrBlock();
-  if (!block) {
-    toast("Nenhum bloco OCR para rejeitar.");
-    return;
-  }
+  if (!block) return toast("Nenhum bloco OCR para rejeitar.");
   makeHumanReviewDecision(block, "rejected");
 }
 
 function confirmCurrentOcrSystemState() {
   const block = currentOcrBlock();
-  if (!block) {
-    toast("Nenhum bloco OCR para revisar.");
-    return;
-  }
+  if (!block) return toast("Nenhum bloco OCR para revisar.");
   makeSystemReviewDecision(block, "confirmed");
 }
 
 function rejectCurrentOcrSystemState() {
   const block = currentOcrBlock();
-  if (!block) {
-    toast("Nenhum bloco OCR para revisar.");
-    return;
-  }
+  if (!block) return toast("Nenhum bloco OCR para revisar.");
   makeSystemReviewDecision(block, "rejected");
+}
+
+function confirmCurrentOcrMeasureState() {
+  const block = currentOcrBlock();
+  if (!block) return toast("Nenhum bloco OCR para revisar.");
+  makeMeasureReviewDecision(block, "confirmed");
+}
+
+function rejectCurrentOcrMeasureState() {
+  const block = currentOcrBlock();
+  if (!block) return toast("Nenhum bloco OCR para revisar.");
+  makeMeasureReviewDecision(block, "rejected");
 }
 
 function renderOcrBlockDetails(block) {
@@ -303,6 +356,7 @@ function renderOcrBlockDetails(block) {
   const chordAnalysis = block.chord_analysis || null;
   const humanReview = block.human_review || null;
   const systemHumanReview = block.system_human_review || null;
+  const measureHumanReview = block.measure_human_review || null;
 
   return `
     <div class="ocr-detail-grid">
@@ -313,22 +367,13 @@ function renderOcrBlockDetails(block) {
     </div>
 
     <h4>Revisão humana da classificação</h4>
-    <div class="evidence-box">
-      <p><b>Status:</b> ${escapeHtml(humanReview?.status || "pendente")}</p>
-      <p><b>Decisão:</b> ${escapeHtml(humanReview?.decision || "—")}</p>
-      <p><b>Review ID:</b> ${escapeHtml(humanReview?.review_id || "—")}</p>
-      <p><b>Data:</b> ${escapeHtml(humanReview?.reviewed_at || "—")}</p>
-    </div>
+    <div class="evidence-box"><p><b>Status:</b> ${escapeHtml(humanReview?.status || "pendente")}</p><p><b>Decisão:</b> ${escapeHtml(humanReview?.decision || "—")}</p><p><b>Review ID:</b> ${escapeHtml(humanReview?.review_id || "—")}</p><p><b>Data:</b> ${escapeHtml(humanReview?.reviewed_at || "—")}</p></div>
 
     <h4>Revisão humana OCR→sistema</h4>
-    <div class="evidence-box">
-      <p><b>Status:</b> ${escapeHtml(systemHumanReview?.status || "pendente")}</p>
-      <p><b>Decisão:</b> ${escapeHtml(systemHumanReview?.decision || "—")}</p>
-      <p><b>Review ID:</b> ${escapeHtml(systemHumanReview?.review_id || "—")}</p>
-      <p><b>Associação revisada:</b> ${escapeHtml(systemHumanReview?.association_status_reviewed || "—")}</p>
-      <p><b>Sistema preservado:</b> ${escapeHtml(systemHumanReview?.candidate_system_id_preserved || "—")}</p>
-      <p><b>Data:</b> ${escapeHtml(systemHumanReview?.reviewed_at || "—")}</p>
-    </div>
+    <div class="evidence-box"><p><b>Status:</b> ${escapeHtml(systemHumanReview?.status || "pendente")}</p><p><b>Decisão:</b> ${escapeHtml(systemHumanReview?.decision || "—")}</p><p><b>Review ID:</b> ${escapeHtml(systemHumanReview?.review_id || "—")}</p><p><b>Associação revisada:</b> ${escapeHtml(systemHumanReview?.association_status_reviewed || "—")}</p><p><b>Sistema preservado:</b> ${escapeHtml(systemHumanReview?.candidate_system_id_preserved || "—")}</p><p><b>Data:</b> ${escapeHtml(systemHumanReview?.reviewed_at || "—")}</p></div>
+
+    <h4>Revisão humana OCR→compasso</h4>
+    <div class="evidence-box"><p><b>Status:</b> ${escapeHtml(measureHumanReview?.status || "pendente")}</p><p><b>Decisão:</b> ${escapeHtml(measureHumanReview?.decision || "—")}</p><p><b>Review ID:</b> ${escapeHtml(measureHumanReview?.review_id || "—")}</p><p><b>Associação revisada:</b> ${escapeHtml(measureHumanReview?.association_status_reviewed || "—")}</p><p><b>Compasso preservado:</b> ${escapeHtml(measureHumanReview?.candidate_measure_number_preserved || "—")}</p><p><b>Confiança preservada:</b> ${escapeHtml(measureHumanReview?.confidence_score_preserved ?? "—")}</p><p><b>Data:</b> ${escapeHtml(measureHumanReview?.reviewed_at || "—")}</p></div>
 
     <h4>Texto OCR bruto preservado</h4>
     <pre class="ocr-raw">${escapeHtml(block.text || "")}</pre>
@@ -337,27 +382,13 @@ function renderOcrBlockDetails(block) {
     <pre class="ocr-normalized">${escapeHtml(block.normalized_text || "")}</pre>
 
     <h4>Região funcional</h4>
-    <div class="evidence-box">
-      <p><b>Região:</b> ${escapeHtml(region?.region_id || "não localizada")}</p>
-      <p><b>Tipo:</b> ${escapeHtml(region?.region_type || "—")}</p>
-      <p><b>Confiança:</b> ${escapeHtml(region?.confidence || "—")}</p>
-      <p><b>Motivo:</b> ${escapeHtml(region?.reason || "—")}</p>
-    </div>
+    <div class="evidence-box"><p><b>Região:</b> ${escapeHtml(region?.region_id || "não localizada")}</p><p><b>Tipo:</b> ${escapeHtml(region?.region_type || "—")}</p><p><b>Confiança:</b> ${escapeHtml(region?.confidence || "—")}</p><p><b>Motivo:</b> ${escapeHtml(region?.reason || "—")}</p></div>
 
     <h4>Associação OCR→sistema</h4>
-    <div class="evidence-box blocked-box">
-      <p><b>Status:</b> ${escapeHtml(systemAssociation?.association_status || "não disponível")}</p>
-      <p><b>Sistema candidato:</b> ${escapeHtml(systemAssociation?.candidate_system_id || "—")}</p>
-      <p><b>Motivo:</b> ${escapeHtml(systemAssociation?.reason || "—")}</p>
-    </div>
+    <div class="evidence-box blocked-box"><p><b>Status:</b> ${escapeHtml(systemAssociation?.association_status || "não disponível")}</p><p><b>Sistema candidato:</b> ${escapeHtml(systemAssociation?.candidate_system_id || "—")}</p><p><b>Motivo:</b> ${escapeHtml(systemAssociation?.reason || "—")}</p></div>
 
     <h4>Associação OCR→compasso</h4>
-    <div class="evidence-box blocked-box">
-      <p><b>Status:</b> ${escapeHtml(measureAssociation?.association_status || "não disponível")}</p>
-      <p><b>Compasso candidato:</b> ${escapeHtml(measureAssociation?.candidate_measure_number || "—")}</p>
-      <p><b>Confiança:</b> ${escapeHtml(measureAssociation?.confidence_score ?? "—")} / ${escapeHtml(measureAssociation?.confidence_level || "—")}</p>
-      <p><b>Motivo:</b> ${escapeHtml(measureAssociation?.reason || "—")}</p>
-    </div>
+    <div class="evidence-box blocked-box"><p><b>Status:</b> ${escapeHtml(measureAssociation?.association_status || "não disponível")}</p><p><b>Compasso candidato:</b> ${escapeHtml(measureAssociation?.candidate_measure_number || "—")}</p><p><b>Confiança:</b> ${escapeHtml(measureAssociation?.confidence_score ?? "—")} / ${escapeHtml(measureAssociation?.confidence_level || "—")}</p><p><b>Motivo:</b> ${escapeHtml(measureAssociation?.reason || "—")}</p></div>
 
     <h4>Análise de cifra candidata</h4>
     ${formatJson(chordAnalysis)}
@@ -391,10 +422,11 @@ function refreshOcrReview() {
     const measureAssociation = findMeasureAssociation(region);
     const reviewStatus = block.human_review?.status || "classificação pendente";
     const systemReviewStatus = block.system_human_review?.status || "sistema pendente";
+    const measureReviewStatus = block.measure_human_review?.status || "compasso pendente";
     const div = document.createElement("div");
     div.className = `item ${index === currentOcrBlockIndex ? "active" : ""}`;
     div.innerHTML = `<div class="row"><b>${escapeHtml(block.text || "[vazio]")}</b><span>${escapeHtml(block.classification || "—")}</span></div>
-      <small>${escapeHtml(block.fusion_id || "")}${region?.region_type ? ` — ${escapeHtml(region.region_type)}` : ""}${measureAssociation?.association_status ? ` — ${escapeHtml(measureAssociation.association_status)}` : ""} — ${escapeHtml(reviewStatus)} — ${escapeHtml(systemReviewStatus)}</small>`;
+      <small>${escapeHtml(block.fusion_id || "")}${region?.region_type ? ` — ${escapeHtml(region.region_type)}` : ""}${measureAssociation?.association_status ? ` — ${escapeHtml(measureAssociation.association_status)}` : ""} — ${escapeHtml(reviewStatus)} — ${escapeHtml(systemReviewStatus)} — ${escapeHtml(measureReviewStatus)}</small>`;
     div.onclick = () => {
       currentOcrBlockIndex = index;
       refreshOcrReview();
@@ -405,25 +437,18 @@ function refreshOcrReview() {
   details.innerHTML = renderOcrBlockDetails(currentOcrBlock());
 }
 
-function fileBaseName(fileName = "") {
-  return fileName.replace(/\.[^.]+$/, "").trim();
-}
-
-function detectedSummary() {
-  return protocol.systems?.[0]?.detected_summary || {};
-}
+function fileBaseName(fileName = "") { return fileName.replace(/\.[^.]+$/, "").trim(); }
+function detectedSummary() { return protocol.systems?.[0]?.detected_summary || {}; }
 
 function syncMusicMetadataFromImport(file) {
   const summary = detectedSummary();
   const importedTitle = protocol.music?.title?.trim();
   const fileTitle = fileBaseName(file?.name || protocol.source?.file_name || "");
-
   protocol.music ||= {};
   protocol.music.title = importedTitle || fileTitle || "Sem título";
   protocol.music.key = summary.key_signature || protocol.music.key || "";
   protocol.music.meter_default = summary.meter || protocol.measures?.[0]?.meter || protocol.music.meter_default || "";
   protocol.music.tempo = summary.tempo || protocol.music.tempo || "";
-
   $("musicTitle").value = protocol.music.title || "";
   $("musicKey").value = protocol.music.key || "";
   $("meterDefault").value = protocol.music.meter_default || "";
@@ -466,9 +491,7 @@ async function clearFrontendCacheAndReload() {
       const keys = await caches.keys();
       await Promise.all(keys.filter(key => key.startsWith("cpp-professional-omr-")).map(key => caches.delete(key)));
     }
-  } catch (err) {
-    console.warn("Falha ao limpar cache do frontend", err);
-  }
+  } catch (err) { console.warn("Falha ao limpar cache do frontend", err); }
   window.location.reload();
 }
 
@@ -479,12 +502,10 @@ async function processWithProfessionalOmr() {
     $("fileInfo").textContent = valid.message;
     return;
   }
-
   const backendUrl = $("backendUrl").value.trim() || "http://localhost:8787";
   $("btnProfessionalOmr").disabled = true;
   $("btnProfessionalOmr").textContent = "Processando...";
   setStatus("Enviando arquivo ao backend OMR profissional...");
-
   try {
     const result = await analyzeWithProfessionalOmr({ file: selectedFile, backendUrl });
     protocol = result || createInitialProtocol();
@@ -492,7 +513,6 @@ async function processWithProfessionalOmr() {
     currentMeasureIndex = 0;
     currentOcrBlockIndex = 0;
     persist();
-
     setStatus(buildProcessingSummary(protocol));
     refreshReview();
     refreshOcrReview();
@@ -508,15 +528,10 @@ async function processWithProfessionalOmr() {
   }
 }
 
-function initBuildInfo() {
-  if ($("frontendBuild")) {
-    $("frontendBuild").textContent = `Frontend build: ${FRONTEND_BUILD}`;
-  }
-}
+function initBuildInfo() { if ($("frontendBuild")) $("frontendBuild").textContent = `Frontend build: ${FRONTEND_BUILD}`; }
 
 function initEvents() {
   initBuildInfo();
-
   $("fileInput").onchange = ev => {
     selectedFile = ev.target.files?.[0] || null;
     const valid = validateFile(selectedFile);
@@ -528,7 +543,6 @@ function initEvents() {
       $("tempo").value = "";
     }
   };
-
   $("btnCheckBackend").onclick = async () => {
     const backendUrl = $("backendUrl").value.trim() || "http://localhost:8787";
     $("backendStatus").textContent = "Verificando backend...";
@@ -541,79 +555,20 @@ function initEvents() {
       toast("Backend indisponível.");
     }
   };
-
-  if ($("btnClearFrontendCache")) {
-    $("btnClearFrontendCache").onclick = clearFrontendCacheAndReload;
-  }
-
+  if ($("btnClearFrontendCache")) $("btnClearFrontendCache").onclick = clearFrontendCacheAndReload;
   $("btnProfessionalOmr").onclick = processWithProfessionalOmr;
-
-  $("btnPrevMeasure").onclick = () => {
-    if (!protocol.measures?.length) return;
-    currentMeasureIndex = Math.max(0, currentMeasureIndex - 1);
-    refreshReview();
-  };
-
-  $("btnNextMeasure").onclick = () => {
-    if (!protocol.measures?.length) return;
-    currentMeasureIndex = Math.min(protocol.measures.length - 1, currentMeasureIndex + 1);
-    refreshReview();
-  };
-
-  if ($("btnPrevOcrBlock")) {
-    $("btnPrevOcrBlock").onclick = () => {
-      const blocks = getOcrBlocks();
-      if (!blocks.length) return;
-      currentOcrBlockIndex = Math.max(0, currentOcrBlockIndex - 1);
-      refreshOcrReview();
-    };
-  }
-
-  if ($("btnNextOcrBlock")) {
-    $("btnNextOcrBlock").onclick = () => {
-      const blocks = getOcrBlocks();
-      if (!blocks.length) return;
-      currentOcrBlockIndex = Math.min(blocks.length - 1, currentOcrBlockIndex + 1);
-      refreshOcrReview();
-    };
-  }
-
-  if ($("btnApproveOcrClassification")) {
-    $("btnApproveOcrClassification").onclick = approveCurrentOcrClassification;
-  }
-
-  if ($("btnRejectOcrClassification")) {
-    $("btnRejectOcrClassification").onclick = rejectCurrentOcrClassification;
-  }
-
-  if ($("btnConfirmOcrSystemState")) {
-    $("btnConfirmOcrSystemState").onclick = confirmCurrentOcrSystemState;
-  }
-
-  if ($("btnRejectOcrSystemState")) {
-    $("btnRejectOcrSystemState").onclick = rejectCurrentOcrSystemState;
-  }
-
-  $("btnAcceptMeasure").onclick = () => {
-    const m = currentMeasure();
-    if (!m) return;
-    acceptMeasure(m);
-    persist();
-    refreshReview();
-    generateOutputs();
-    toast("Compasso aprovado.");
-  };
-
-  $("btnMarkUncertain").onclick = () => {
-    const m = currentMeasure();
-    if (!m) return;
-    markMeasureUncertain(m);
-    persist();
-    refreshReview();
-    generateOutputs();
-    toast("Compasso marcado como incerto.");
-  };
-
+  $("btnPrevMeasure").onclick = () => { if (protocol.measures?.length) { currentMeasureIndex = Math.max(0, currentMeasureIndex - 1); refreshReview(); } };
+  $("btnNextMeasure").onclick = () => { if (protocol.measures?.length) { currentMeasureIndex = Math.min(protocol.measures.length - 1, currentMeasureIndex + 1); refreshReview(); } };
+  if ($("btnPrevOcrBlock")) $("btnPrevOcrBlock").onclick = () => { const blocks = getOcrBlocks(); if (blocks.length) { currentOcrBlockIndex = Math.max(0, currentOcrBlockIndex - 1); refreshOcrReview(); } };
+  if ($("btnNextOcrBlock")) $("btnNextOcrBlock").onclick = () => { const blocks = getOcrBlocks(); if (blocks.length) { currentOcrBlockIndex = Math.min(blocks.length - 1, currentOcrBlockIndex + 1); refreshOcrReview(); } };
+  if ($("btnApproveOcrClassification")) $("btnApproveOcrClassification").onclick = approveCurrentOcrClassification;
+  if ($("btnRejectOcrClassification")) $("btnRejectOcrClassification").onclick = rejectCurrentOcrClassification;
+  if ($("btnConfirmOcrSystemState")) $("btnConfirmOcrSystemState").onclick = confirmCurrentOcrSystemState;
+  if ($("btnRejectOcrSystemState")) $("btnRejectOcrSystemState").onclick = rejectCurrentOcrSystemState;
+  if ($("btnConfirmOcrMeasureState")) $("btnConfirmOcrMeasureState").onclick = confirmCurrentOcrMeasureState;
+  if ($("btnRejectOcrMeasureState")) $("btnRejectOcrMeasureState").onclick = rejectCurrentOcrMeasureState;
+  $("btnAcceptMeasure").onclick = () => { const m = currentMeasure(); if (!m) return; acceptMeasure(m); persist(); refreshReview(); generateOutputs(); toast("Compasso aprovado."); };
+  $("btnMarkUncertain").onclick = () => { const m = currentMeasure(); if (!m) return; markMeasureUncertain(m); persist(); refreshReview(); generateOutputs(); toast("Compasso marcado como incerto."); };
   $("btnGenerateOutputs").onclick = () => { applyUserMusicMetadata(); generateOutputs(); };
   $("btnExportJson").onclick = () => { applyUserMusicMetadata(); generateOutputs(); downloadText(versioned("cpp_protocol", "json"), exportJson(protocol), "application/json;charset=utf-8"); };
   $("btnExportTech").onclick = () => { applyUserMusicMetadata(); generateOutputs(); downloadText(versioned("cifra_tecnica", "txt"), protocol.outputs.technical_chord_sheet); };
@@ -629,8 +584,7 @@ function initEvents() {
     downloadText(versioned("relatorio_incertezas", "txt"), protocol.outputs.uncertainty_report);
     downloadText(versioned("relatorio_deteccao", "txt"), protocol.outputs.detection_report);
   };
-
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js?v=audit-37-cache-v1").catch(() => {});
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js?v=audit-38-cache-v1").catch(() => {});
   refreshReview();
   refreshOcrReview();
   generateOutputs();
