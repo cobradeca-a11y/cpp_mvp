@@ -5,15 +5,15 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
   <meta name="theme-color" content="#111827" />
   <title>cpp_pro — Conversor Profissional de Partituras</title>
-  <link rel="manifest" href="./manifest.json?v=audit-35-cache-v1" />
-  <link rel="stylesheet" href="./src/styles.css?v=audit-35-cache-v1" />
+  <link rel="manifest" href="./manifest.json?v=audit-36-cache-v1" />
+  <link rel="stylesheet" href="./src/styles.css?v=audit-36-cache-v1" />
 </head>
 <body>
   <header class="app-header">
     <div>
       <h1>cpp_pro</h1>
       <p>Conversor Profissional de Partituras — OMR, MusicXML, Revisão e Cifra Tocável</p>
-      <p id="frontendBuild" class="build-info">Frontend build: audit-35-cache-v1</p>
+      <p id="frontendBuild" class="build-info">Frontend build: audit-36-cache-v1</p>
     </div>
   </header>
 
@@ -76,10 +76,12 @@
 
     <section class="panel active">
       <h2>2A. Revisão OCR por bloco</h2>
-      <p class="hint">Auditoria 35: inspeção humana dos blocos OCR. Esta tela não aprova, rejeita nem altera evidência automaticamente.</p>
+      <p class="hint">Auditoria 36: decisão humana auditável sobre a classificação OCR. O texto bruto, normalizado e a classificação original continuam preservados.</p>
 
       <div class="toolbar sticky">
         <button id="btnPrevOcrBlock">Bloco OCR anterior</button>
+        <button id="btnApproveOcrClassification" class="ok">Aprovar classificação OCR</button>
+        <button id="btnRejectOcrClassification" class="warn">Rejeitar classificação OCR</button>
         <button id="btnNextOcrBlock">Próximo bloco OCR</button>
       </div>
 
@@ -117,6 +119,6 @@
   </main>
 
   <div id="toast" class="toast hidden"></div>
-  <script type="module" src="./src/app.js?v=audit-35-cache-v1"></script>
+  <script type="module" src="./src/app.js?v=audit-36-cache-v1"></script>
 </body>
 </html>
