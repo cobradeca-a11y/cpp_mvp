@@ -193,11 +193,11 @@ def classify_ocr_text(text: str) -> str:
     if cleaned in NAVIGATION_TERMS:
         return "possible_navigation"
 
-    if is_editorial_text(raw, cleaned, compact):
-        return "editorial_text"
-
     if CHORD_RE.match(compact):
         return "possible_chord"
+
+    if is_editorial_text(raw, cleaned, compact):
+        return "editorial_text"
 
     if is_likely_lyric_word(raw, cleaned):
         return "possible_lyric"
