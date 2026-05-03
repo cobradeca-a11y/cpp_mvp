@@ -61,7 +61,7 @@ def test_audit25_preserves_unassigned_layout_and_counts_classifications():
 
     fusion = build_initial_fusion(protocol)
 
-    assert fusion["version"] == "audit-27"
+    assert fusion["version"] == "audit-28"
     assert fusion["status"] == "evidence_indexed_needs_layout_mapping"
     assert fusion["classification_counts"] == {
         "instrument_label": 1,
@@ -100,6 +100,7 @@ def test_audit26_1_groups_ocr_blocks_by_visual_line_without_measure_assignment()
 
     assert len(fusion["text_line_groups"]) == 2
     assert fusion["text_line_groups"][0]["text"] == "Was ist"
+    assert fusion["text_line_groups"][0]["normalized_text"] == "Was ist"
     assert fusion["text_line_groups"][0]["text_block_ids"] == ["fx0001", "fx0002"]
     assert fusion["text_line_groups"][0]["bbox"] == {
         "x_min": 10.0,
@@ -161,3 +162,36 @@ def test_audit27_groups_visual_lines_into_functional_regions_without_assignment(
         }
         for region in fusion["text_region_groups"]
     )
+
+
+def test_audit28_normalizes_ocr_text_without_replacing_raw_evidence():
+    protocol = {
+        "source": {"omr_status": "success"},
+        "ocr": {
+            "status": "success",
+            "text_blocks": [
+                {"text": " Kuẞ, ", "bbox": {"vertices": [{"x": 10, "y": 10}, {"x": 30, "y": 10}, {"x": 30, "y": 22}, {"x": 10, "y": 22}]}, "page": 1},
+                {"text": "—", "bbox": {"vertices": [{"x": 36, "y": 10}, {"x": 40, "y": 10}, {"x": 40, "y": 22}, {"x": 36, "y": 22}]}, "page": 1},
+                {"text": "A7 / G", "bbox": {"vertices": [{"x": 50, "y": 50}, {"x": 90, "y": 50}, {"x": 90, "y": 62}, {"x": 50, "y": 62}]}, "page": 1},
+            ],
+        },
+        "systems": [],
+        "measures": [{"id": "m1"}],
+    }
+
+    fusion = build_initial_fusion(protocol)
+
+    assert fusion["normalization_counts"] == {
+        "continuation_token": 1,
+        "normalized_chord_candidate": 1,
+        "normalized_text_candidate": 1,
+    }
+    assert fusion["text_blocks_index"][0]["text"] == "Kuẞ,"
+    assert fusion["text_blocks_index"][0]["normalized_text"] == "Kuß"
+    assert fusion["text_blocks_index"][1]["text"] == "—"
+    assert fusion["text_blocks_index"][1]["normalized_text"] == "-"
+    assert fusion["text_blocks_index"][2]["text"] == "A7 / G"
+    assert fusion["text_blocks_index"][2]["normalized_text"] == "A7/G"
+    assert fusion["possible_chords"][0]["normalized_text"] == "A7/G"
+    assert fusion["text_line_groups"][0]["normalized_text"] == "Kuß -"
+    assert fusion["text_region_groups"][0]["normalized_text"] == "Kuß -"
