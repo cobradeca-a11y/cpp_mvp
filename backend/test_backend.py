@@ -146,10 +146,15 @@ def test_mxl_package_imports_measures():
     assert data["systems"][0]["detected_summary"]["measure_count"] == 1
 
 
-def test_image_returns_unavailable_when_google_vision_missing_credentials(monkeypatch):
+def test_image_google_vision_adc_failure_is_reported(monkeypatch):
     monkeypatch.setattr(main, "audiveris_available", lambda: False)
     monkeypatch.setenv("OCR_ENGINE", "google_vision")
     monkeypatch.delenv("GOOGLE_APPLICATION_CREDENTIALS", raising=False)
+
+    def fail_adc(*_args, **_kwargs):
+        raise RuntimeError("Application Default Credentials not found")
+
+    monkeypatch.setattr("ocr_engine._run_google_vision_image", fail_adc)
 
     client = TestClient(app)
     response = client.post(
@@ -160,9 +165,9 @@ def test_image_returns_unavailable_when_google_vision_missing_credentials(monkey
     assert response.status_code == 200
     data = response.json()
     assert data["source"]["file_type"] == "png"
-    assert_ocr_contract(data, "unavailable")
+    assert_ocr_contract(data, "failed")
     assert data["ocr"]["engine"] == "google_vision"
-    assert "GOOGLE_APPLICATION_CREDENTIALS" in data["ocr"]["warnings"][0]
+    assert "gcloud auth application-default login" in data["ocr"]["warnings"][0]
     assert data["measures"] == []
 
 
@@ -188,7 +193,7 @@ def test_pdf_google_vision_without_page_conversion_remains_unavailable(monkeypat
     assert data["measures"] == []
 
 
-def test_image_google_vision_success_with_mock(monkeypatch, tmp_path):
+def test_image_google_vision_success_with_mocked_json_credentials(monkeypatch, tmp_path):
     monkeypatch.setattr(main, "audiveris_available", lambda: False)
     monkeypatch.setenv("OCR_ENGINE", "google_vision")
     monkeypatch.setenv("OCR_FEATURE", "DOCUMENT_TEXT_DETECTION")
@@ -221,4 +226,37 @@ def test_image_google_vision_success_with_mock(monkeypatch, tmp_path):
     assert data["ocr"]["engine"] == "google_vision"
     assert data["ocr"]["text_blocks"][0]["text"] == "Am"
     assert data["source"]["ocr_status"] == "success"
+    assert data["measures"] == []
+
+
+def test_image_google_vision_success_with_mocked_adc(monkeypatch):
+    monkeypatch.setattr(main, "audiveris_available", lambda: False)
+    monkeypatch.setenv("OCR_ENGINE", "google_vision")
+    monkeypatch.delenv("GOOGLE_APPLICATION_CREDENTIALS", raising=False)
+    monkeypatch.setattr(
+        "ocr_engine._run_google_vision_image",
+        lambda *_args, **_kwargs: [
+            {
+                "text": "Glória",
+                "confidence": 0.0,
+                "bbox": {"vertices": [{"x": 5, "y": 6}, {"x": 7, "y": 6}, {"x": 7, "y": 8}, {"x": 5, "y": 8}]},
+                "page": 1,
+                "source": "ocr",
+            }
+        ],
+    )
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/omr/analyze",
+        files={"file": ("sample.jpg", b"fake-jpg", "image/jpeg")},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["source"]["file_type"] == "jpg"
+    assert_ocr_contract(data, "success")
+    assert data["ocr"]["engine"] == "google_vision"
+    assert data["ocr"]["text_blocks"][0]["text"] == "Glória"
+    assert "Application Default Credentials" in data["ocr"]["warnings"][0]
     assert data["measures"] == []
