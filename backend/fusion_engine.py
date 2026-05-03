@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
+from statistics import median
 from typing import Any
 
 CHORD_RE = re.compile(
@@ -72,10 +73,9 @@ MUSIC_SYMBOL_NOISE_TOKENS = {"។", "·", "•", "*"}
 def build_initial_fusion(protocol: dict[str, Any]) -> dict[str, Any]:
     """Build a conservative MusicXML + OCR evidence index.
 
-    Audit 23 does not align text to measures yet because Audiveris/MusicXML
-    output currently has no reliable page/system bounding boxes in the CPP
-    protocol. The goal is to preserve evidence, classify obvious candidates,
-    and mark every spatial assignment as pending instead of inventing matches.
+    Audit 26.1 still does not align text to systems or measures. It only
+    classifies OCR blocks and groups nearby OCR blocks into visual text lines
+    for human review. Every musical/spatial assignment remains pending.
     """
     ocr = protocol.get("ocr") or {}
     source = protocol.get("source") or {}
@@ -86,7 +86,7 @@ def build_initial_fusion(protocol: dict[str, Any]) -> dict[str, Any]:
     fusion = {
         "status": "not_applicable",
         "engine": "initial_musicxml_ocr_fusion",
-        "version": "audit-25",
+        "version": "audit-26.1",
         "inputs": {
             "omr_status": source.get("omr_status", ""),
             "ocr_status": ocr.get("status", source.get("ocr_status", "")),
@@ -95,6 +95,7 @@ def build_initial_fusion(protocol: dict[str, Any]) -> dict[str, Any]:
             "text_blocks_count": len(text_blocks),
         },
         "text_blocks_index": [],
+        "text_line_groups": [],
         "classification_counts": {},
         "possible_chords": [],
         "possible_lyrics": [],
@@ -133,11 +134,7 @@ def build_initial_fusion(protocol: dict[str, Any]) -> dict[str, Any]:
             "bbox": block.get("bbox", {}),
             "page": block.get("page", 1),
             "source": "ocr",
-            "assignment": {
-                "system_id": None,
-                "measure_id": None,
-                "status": "unassigned_no_musicxml_layout",
-            },
+            "assignment": pending_assignment(),
         }
         fusion["text_blocks_index"].append(indexed)
 
@@ -156,12 +153,21 @@ def build_initial_fusion(protocol: dict[str, Any]) -> dict[str, Any]:
             fusion["possible_navigation"].append(candidate)
 
     fusion["classification_counts"] = dict(sorted(classification_counts.items()))
+    fusion["text_line_groups"] = group_ocr_blocks_by_visual_line(fusion["text_blocks_index"])
     return fusion
 
 
 def sync_initial_fusion(protocol: dict[str, Any]) -> dict[str, Any]:
     protocol["fusion"] = build_initial_fusion(protocol)
     return protocol
+
+
+def pending_assignment() -> dict[str, Any]:
+    return {
+        "system_id": None,
+        "measure_id": None,
+        "status": "unassigned_no_musicxml_layout",
+    }
 
 
 def classify_ocr_text(text: str) -> str:
@@ -286,3 +292,107 @@ def is_music_symbol_noise(raw: str) -> bool:
         return False
 
     return any(not ch.isspace() and ch not in PUNCTUATION_TOKENS and ch not in CONTINUATION_TOKENS for ch in raw)
+
+
+def group_ocr_blocks_by_visual_line(indexed_blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    blocks_with_bounds = []
+    for block in indexed_blocks:
+        bounds = bbox_bounds(block.get("bbox", {}))
+        if bounds is None:
+            continue
+        x_min, y_min, x_max, y_max = bounds
+        height = max(1.0, y_max - y_min)
+        blocks_with_bounds.append({
+            "block": block,
+            "bounds": bounds,
+            "center_y": (y_min + y_max) / 2,
+            "height": height,
+            "page": block.get("page", 1),
+        })
+
+    if not blocks_with_bounds:
+        return []
+
+    median_height = median(item["height"] for item in blocks_with_bounds)
+    y_tolerance = max(6.0, median_height * 0.65)
+    grouped: list[dict[str, Any]] = []
+
+    for item in sorted(blocks_with_bounds, key=lambda row: (row["page"], row["center_y"], row["bounds"][0])):
+        target = None
+        for group in grouped:
+            if group["page"] != item["page"]:
+                continue
+            if abs(group["center_y"] - item["center_y"]) <= y_tolerance:
+                target = group
+                break
+
+        if target is None:
+            target = {"page": item["page"], "center_y": item["center_y"], "items": []}
+            grouped.append(target)
+
+        target["items"].append(item)
+        target["center_y"] = sum(row["center_y"] for row in target["items"]) / len(target["items"])
+
+    line_groups = []
+    for line_idx, group in enumerate(sorted(grouped, key=lambda row: (row["page"], row["center_y"])), start=1):
+        items = sorted(group["items"], key=lambda row: row["bounds"][0])
+        text_blocks = [item["block"] for item in items]
+        bounds = merge_bounds([item["bounds"] for item in items])
+        classifications = Counter(block["classification"] for block in text_blocks)
+        page = group["page"]
+        line_groups.append({
+            "line_id": f"fl{line_idx:04d}",
+            "page": page,
+            "text": " ".join(block["text"] for block in text_blocks).strip(),
+            "text_block_ids": [block["fusion_id"] for block in text_blocks],
+            "classifications": dict(sorted(classifications.items())),
+            "bbox": bounds_to_bbox(bounds),
+            "assignment": pending_assignment(),
+        })
+
+    return line_groups
+
+
+def bbox_bounds(bbox: Any) -> tuple[float, float, float, float] | None:
+    if not isinstance(bbox, dict):
+        return None
+
+    if isinstance(bbox.get("vertices"), list):
+        points = bbox["vertices"]
+        xs = [point.get("x") for point in points if isinstance(point, dict) and point.get("x") is not None]
+        ys = [point.get("y") for point in points if isinstance(point, dict) and point.get("y") is not None]
+        if xs and ys:
+            return float(min(xs)), float(min(ys)), float(max(xs)), float(max(ys))
+
+    keys = {"x", "y", "width", "height"}
+    if keys.issubset(bbox):
+        x = float(bbox["x"])
+        y = float(bbox["y"])
+        return x, y, x + float(bbox["width"]), y + float(bbox["height"])
+
+    alt_keys = {"x_min", "y_min", "x_max", "y_max"}
+    if alt_keys.issubset(bbox):
+        return float(bbox["x_min"]), float(bbox["y_min"]), float(bbox["x_max"]), float(bbox["y_max"])
+
+    return None
+
+
+def merge_bounds(bounds_list: list[tuple[float, float, float, float]]) -> tuple[float, float, float, float]:
+    return (
+        min(bounds[0] for bounds in bounds_list),
+        min(bounds[1] for bounds in bounds_list),
+        max(bounds[2] for bounds in bounds_list),
+        max(bounds[3] for bounds in bounds_list),
+    )
+
+
+def bounds_to_bbox(bounds: tuple[float, float, float, float]) -> dict[str, float]:
+    x_min, y_min, x_max, y_max = bounds
+    return {
+        "x_min": x_min,
+        "y_min": y_min,
+        "x_max": x_max,
+        "y_max": y_max,
+        "width": x_max - x_min,
+        "height": y_max - y_min,
+    }
