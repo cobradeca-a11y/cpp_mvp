@@ -8,6 +8,8 @@ import { generatePlayableChordSheet } from "./modules/chord-sheet-playable.js";
 import { globalUncertaintyReport } from "./modules/confidence-engine.js";
 import { downloadText, versioned } from "./modules/export-output.js";
 
+const FRONTEND_BUILD = "audit-24-1-cache-v1";
+
 let protocol = loadProtocol();
 let selectedFile = null;
 let currentMeasureIndex = 0;
@@ -143,6 +145,23 @@ function generateOutputs() {
   persist();
 }
 
+async function clearFrontendCacheAndReload() {
+  toast("Limpando cache do app...");
+  try {
+    if ("serviceWorker" in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map(reg => reg.unregister()));
+    }
+    if ("caches" in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.filter(key => key.startsWith("cpp-professional-omr-")).map(key => caches.delete(key)));
+    }
+  } catch (err) {
+    console.warn("Falha ao limpar cache do frontend", err);
+  }
+  window.location.reload();
+}
+
 async function processWithProfessionalOmr() {
   const valid = validateFile(selectedFile);
   if (!valid.ok) {
@@ -177,7 +196,15 @@ async function processWithProfessionalOmr() {
   }
 }
 
+function initBuildInfo() {
+  if ($("frontendBuild")) {
+    $("frontendBuild").textContent = `Frontend build: ${FRONTEND_BUILD}`;
+  }
+}
+
 function initEvents() {
+  initBuildInfo();
+
   $("fileInput").onchange = ev => {
     selectedFile = ev.target.files?.[0] || null;
     const valid = validateFile(selectedFile);
@@ -202,6 +229,10 @@ function initEvents() {
       toast("Backend indisponível.");
     }
   };
+
+  if ($("btnClearFrontendCache")) {
+    $("btnClearFrontendCache").onclick = clearFrontendCacheAndReload;
+  }
 
   $("btnProfessionalOmr").onclick = processWithProfessionalOmr;
 
@@ -253,7 +284,7 @@ function initEvents() {
     downloadText(versioned("relatorio_deteccao", "txt"), protocol.outputs.detection_report);
   };
 
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js").catch(() => {});
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js?v=audit-24-1-cache-v1").catch(() => {});
   refreshReview();
   generateOutputs();
 }
