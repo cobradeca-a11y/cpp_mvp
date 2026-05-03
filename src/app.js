@@ -8,7 +8,7 @@ import { generatePlayableChordSheet } from "./modules/chord-sheet-playable.js";
 import { globalUncertaintyReport } from "./modules/confidence-engine.js";
 import { downloadText, versioned } from "./modules/export-output.js";
 
-const FRONTEND_BUILD = "audit-24-1-cache-v1";
+const FRONTEND_BUILD = "audit-26-cache-v1";
 
 let protocol = loadProtocol();
 let selectedFile = null;
@@ -29,6 +29,30 @@ function persist() {
 
 function setStatus(message) {
   $("processingStatus").textContent = message;
+}
+
+function formatClassificationCounts(fusion) {
+  const counts = fusion.classification_counts || {};
+  const entries = Object.entries(counts).filter(([, value]) => Number(value) > 0);
+  if (!entries.length) return [];
+
+  const labels = {
+    instrument_label: "instrumentos",
+    possible_lyric: "texto/letra provável",
+    lyric_syllable_fragment: "fragmentos de sílaba",
+    lyric_hyphen_or_continuation: "hífens/continuações",
+    punctuation: "pontuação",
+    music_symbol_noise: "ruído/símbolo musical",
+    possible_chord: "cifras candidatas",
+    editorial_text: "texto editorial",
+    possible_navigation: "navegação candidata",
+    unknown: "desconhecido",
+  };
+
+  return [
+    "Classificações OCR/Fusion:",
+    ...entries.map(([key, value]) => `- ${labels[key] || key}: ${value}`),
+  ];
 }
 
 function buildProcessingSummary(protocol) {
@@ -52,9 +76,11 @@ function buildProcessingSummary(protocol) {
   ];
 
   if (fusion.engine) lines.push(`Motor Fusion: ${fusion.engine}`);
+  if (fusion.version) lines.push(`Versão Fusion: ${fusion.version}`);
   if (possibleChords || possibleLyrics) {
     lines.push(`Candidatos OCR: ${possibleChords} cifra(s), ${possibleLyrics} texto(s)/sílaba(s).`);
   }
+  lines.push(...formatClassificationCounts(fusion));
   if (fusion.warnings?.length) {
     lines.push("Avisos Fusion:");
     fusion.warnings.forEach(w => lines.push(`- ${w}`));
@@ -284,7 +310,7 @@ function initEvents() {
     downloadText(versioned("relatorio_deteccao", "txt"), protocol.outputs.detection_report);
   };
 
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js?v=audit-24-1-cache-v1").catch(() => {});
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js?v=audit-26-cache-v1").catch(() => {});
   refreshReview();
   generateOutputs();
 }
