@@ -69,8 +69,9 @@ def assert_ocr_contract(data, expected_status):
 def assert_fusion_contract(data):
     assert "fusion" in data
     assert data["fusion"]["engine"] == "initial_musicxml_ocr_fusion"
-    assert data["fusion"]["version"] == "audit-23"
+    assert data["fusion"]["version"] == "audit-25"
     assert isinstance(data["fusion"]["text_blocks_index"], list)
+    assert isinstance(data["fusion"]["classification_counts"], dict)
     assert isinstance(data["fusion"]["possible_chords"], list)
     assert isinstance(data["fusion"]["possible_lyrics"], list)
     assert isinstance(data["fusion"]["possible_navigation"], list)
