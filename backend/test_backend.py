@@ -111,13 +111,15 @@ def assert_ocr_measure_association_contract(data):
     assert "ocr_measure_associations" in data
     contract = data["ocr_measure_associations"]
     assert contract["engine"] == "cpp_ocr_measure_association_contract"
-    assert contract["version"] == "audit-32"
+    assert contract["version"] == "audit-33"
     assert isinstance(contract["associations"], list)
     assert isinstance(contract["warnings"], list)
     assert isinstance(contract["association_count"], int)
     assert isinstance(contract["assigned_count"], int)
     assert isinstance(contract["blocked_count"], int)
     assert isinstance(contract["unassigned_count"], int)
+    assert isinstance(contract["confidence_counts"], dict)
+    assert isinstance(contract["average_confidence_score"], float)
 
 
 def assert_professional_contracts(data, expected_ocr_status):
@@ -164,6 +166,7 @@ def test_pdf_returns_professional_protocol_when_audiveris_unavailable(monkeypatc
     assert data["layout"]["status"] == "no_layout_subjects"
     assert data["ocr_system_associations"]["status"] == "no_ocr_regions"
     assert data["ocr_measure_associations"]["status"] == "no_ocr_regions"
+    assert data["ocr_measure_associations"]["average_confidence_score"] == 0.0
     assert data["measures"] == []
     assert "validation" in data
     assert data["validation"]["validation_status"] == "pending"
@@ -325,12 +328,22 @@ def test_image_google_vision_success_with_mocked_json_credentials(monkeypatch, t
     )
     assert data["ocr_measure_associations"]["status"] == "blocked_no_system_association"
     assert data["ocr_measure_associations"]["blocked_count"] == 2
+    assert data["ocr_measure_associations"]["confidence_counts"] == {"blocked": 2}
+    assert data["ocr_measure_associations"]["average_confidence_score"] == 0.0
     assert all(
         association["association_status"] == "blocked_no_system_association"
         for association in data["ocr_measure_associations"]["associations"]
     )
     assert all(
         association["candidate_measure_id"] is None
+        for association in data["ocr_measure_associations"]["associations"]
+    )
+    assert all(
+        association["confidence_score"] == 0.0
+        for association in data["ocr_measure_associations"]["associations"]
+    )
+    assert all(
+        association["confidence_level"] == "blocked"
         for association in data["ocr_measure_associations"]["associations"]
     )
 
