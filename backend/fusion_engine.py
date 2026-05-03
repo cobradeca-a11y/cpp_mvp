@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections import Counter
 from statistics import median
 from typing import Any
@@ -73,10 +74,9 @@ MUSIC_SYMBOL_NOISE_TOKENS = {"។", "·", "•", "*"}
 def build_initial_fusion(protocol: dict[str, Any]) -> dict[str, Any]:
     """Build a conservative MusicXML + OCR evidence index.
 
-    Audit 27 groups OCR visual lines into functional evidence regions such as
-    instrument, lyric, chord, editorial, noise, and unknown. It still does not
-    align text to systems or measures. Every musical/spatial assignment remains
-    pending for human review.
+    Audit 28 adds conservative OCR text normalization while preserving the raw
+    OCR text. It still does not align text to systems or measures. Every
+    musical/spatial assignment remains pending for human review.
     """
     ocr = protocol.get("ocr") or {}
     source = protocol.get("source") or {}
@@ -87,7 +87,7 @@ def build_initial_fusion(protocol: dict[str, Any]) -> dict[str, Any]:
     fusion = {
         "status": "not_applicable",
         "engine": "initial_musicxml_ocr_fusion",
-        "version": "audit-27",
+        "version": "audit-28",
         "inputs": {
             "omr_status": source.get("omr_status", ""),
             "ocr_status": ocr.get("status", source.get("ocr_status", "")),
@@ -100,6 +100,7 @@ def build_initial_fusion(protocol: dict[str, Any]) -> dict[str, Any]:
         "text_region_groups": [],
         "classification_counts": {},
         "region_counts": {},
+        "normalization_counts": {},
         "possible_chords": [],
         "possible_lyrics": [],
         "possible_navigation": [],
@@ -121,6 +122,7 @@ def build_initial_fusion(protocol: dict[str, Any]) -> dict[str, Any]:
         )
 
     classification_counts: Counter[str] = Counter()
+    normalization_counts: Counter[str] = Counter()
 
     for idx, block in enumerate(text_blocks, start=1):
         text = str(block.get("text", "")).strip()
@@ -128,11 +130,16 @@ def build_initial_fusion(protocol: dict[str, Any]) -> dict[str, Any]:
             continue
 
         classification = classify_ocr_text(text)
+        normalized = normalize_ocr_evidence(text, classification)
         classification_counts[classification] += 1
+        normalization_counts[normalized["normalization_status"]] += 1
         fusion_id = f"fx{idx:04d}"
         indexed = {
             "fusion_id": fusion_id,
             "text": text,
+            "normalized_text": normalized["normalized_text"],
+            "normalization_status": normalized["normalization_status"],
+            "normalization_notes": normalized["normalization_notes"],
             "classification": classification,
             "bbox": block.get("bbox", {}),
             "page": block.get("page", 1),
@@ -144,6 +151,7 @@ def build_initial_fusion(protocol: dict[str, Any]) -> dict[str, Any]:
         candidate = {
             "fusion_id": fusion_id,
             "text": text,
+            "normalized_text": normalized["normalized_text"],
             "bbox": block.get("bbox", {}),
             "page": block.get("page", 1),
             "assignment_status": "unassigned_no_musicxml_layout",
@@ -156,6 +164,7 @@ def build_initial_fusion(protocol: dict[str, Any]) -> dict[str, Any]:
             fusion["possible_navigation"].append(candidate)
 
     fusion["classification_counts"] = dict(sorted(classification_counts.items()))
+    fusion["normalization_counts"] = dict(sorted(normalization_counts.items()))
     fusion["text_line_groups"] = group_ocr_blocks_by_visual_line(fusion["text_blocks_index"])
     fusion["text_region_groups"] = group_text_lines_by_functional_region(fusion["text_line_groups"])
     fusion["region_counts"] = count_regions(fusion["text_region_groups"])
@@ -217,6 +226,92 @@ def classify_ocr_text(text: str) -> str:
         return "lyric_syllable_fragment"
 
     return "unknown"
+
+
+def normalize_ocr_evidence(text: str, classification: str) -> dict[str, Any]:
+    raw = text.strip()
+    normalized = unicodedata.normalize("NFC", raw)
+    normalized = normalize_quotes_and_dashes(normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    notes = []
+
+    if normalized != raw:
+        notes.append("unicode_or_spacing_normalized")
+
+    if classification == "lyric_hyphen_or_continuation":
+        return {
+            "normalized_text": "-",
+            "normalization_status": "continuation_token",
+            "normalization_notes": notes + ["treated_as_lyric_continuation_marker"],
+        }
+
+    if classification == "punctuation":
+        return {
+            "normalized_text": normalized,
+            "normalization_status": "punctuation_preserved",
+            "normalization_notes": notes + ["punctuation_not_used_as_text"],
+        }
+
+    if classification == "music_symbol_noise":
+        return {
+            "normalized_text": normalized,
+            "normalization_status": "noise_preserved",
+            "normalization_notes": notes + ["symbol_noise_not_used_as_text"],
+        }
+
+    if classification in {"possible_lyric", "lyric_syllable_fragment"}:
+        lyric_text = strip_outer_punctuation(normalized)
+        lyric_text = normalize_german_sharp_s(lyric_text)
+        if lyric_text != normalized:
+            notes.append("lyric_text_cleaned")
+        return {
+            "normalized_text": lyric_text,
+            "normalization_status": "normalized_text_candidate" if lyric_text else "empty_after_normalization",
+            "normalization_notes": notes,
+        }
+
+    if classification == "possible_chord":
+        chord_text = compact_token(normalized)
+        if chord_text != normalized:
+            notes.append("chord_spacing_compacted")
+        return {
+            "normalized_text": chord_text,
+            "normalization_status": "normalized_chord_candidate",
+            "normalization_notes": notes,
+        }
+
+    if classification in {"instrument_label", "editorial_text", "possible_navigation"}:
+        return {
+            "normalized_text": normalized,
+            "normalization_status": "normalized_metadata_candidate",
+            "normalization_notes": notes,
+        }
+
+    return {
+        "normalized_text": normalized,
+        "normalization_status": "preserved_unclassified",
+        "normalization_notes": notes,
+    }
+
+
+def normalize_quotes_and_dashes(text: str) -> str:
+    return (
+        text.replace("–", "-")
+        .replace("—", "-")
+        .replace("−", "-")
+        .replace("’", "'")
+        .replace("‘", "'")
+        .replace("“", '"')
+        .replace("”", '"')
+    )
+
+
+def strip_outer_punctuation(text: str) -> str:
+    return text.strip().strip(".,;:!?()[]{}")
+
+
+def normalize_german_sharp_s(text: str) -> str:
+    return text.replace("ẞ", "ß")
 
 
 def normalize_token(text: str) -> str:
@@ -349,6 +444,7 @@ def group_ocr_blocks_by_visual_line(indexed_blocks: list[dict[str, Any]]) -> lis
             "line_id": f"fl{line_idx:04d}",
             "page": page,
             "text": " ".join(block["text"] for block in text_blocks).strip(),
+            "normalized_text": join_normalized_text(text_blocks),
             "text_block_ids": [block["fusion_id"] for block in text_blocks],
             "classifications": dict(sorted(classifications.items())),
             "bbox": bounds_to_bbox(bounds),
@@ -356,6 +452,15 @@ def group_ocr_blocks_by_visual_line(indexed_blocks: list[dict[str, Any]]) -> lis
         })
 
     return line_groups
+
+
+def join_normalized_text(text_blocks: list[dict[str, Any]]) -> str:
+    values = []
+    for block in text_blocks:
+        normalized = str(block.get("normalized_text", "")).strip()
+        if normalized:
+            values.append(normalized)
+    return " ".join(values).strip()
 
 
 def group_text_lines_by_functional_region(text_line_groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -370,6 +475,7 @@ def group_text_lines_by_functional_region(text_line_groups: list[dict[str, Any]]
             "page": line.get("page", 1),
             "line_ids": [line["line_id"]],
             "text": line.get("text", ""),
+            "normalized_text": line.get("normalized_text", ""),
             "classifications": line.get("classifications", {}),
             "bbox": line.get("bbox", {}),
             "assignment": pending_assignment(),
