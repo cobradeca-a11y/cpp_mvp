@@ -83,6 +83,17 @@ def assert_fusion_contract(data):
     assert isinstance(data["fusion"]["warnings"], list)
 
 
+def assert_layout_contract(data):
+    assert "layout" in data
+    assert data["layout"]["engine"] == "cpp_layout_geometry_contract"
+    assert data["layout"]["version"] == "audit-30"
+    assert isinstance(data["layout"]["pages"], list)
+    assert isinstance(data["layout"]["systems"], list)
+    assert isinstance(data["layout"]["page_geometry_status_counts"], dict)
+    assert isinstance(data["layout"]["system_geometry_status_counts"], dict)
+    assert isinstance(data["layout"]["warnings"], list)
+
+
 def test_health_endpoint():
     client = TestClient(app)
     response = client.get("/health")
@@ -113,10 +124,12 @@ def test_pdf_returns_professional_protocol_when_audiveris_unavailable(monkeypatc
     assert data["source"]["validation_status"] == "pending"
     assert_ocr_contract(data, "unavailable")
     assert_fusion_contract(data)
+    assert_layout_contract(data)
     assert data["ocr"]["text_blocks"] == []
     assert data["ocr"]["possible_chords"] == []
     assert data["ocr"]["possible_lyrics"] == []
     assert data["fusion"]["status"] == "no_ocr_text"
+    assert data["layout"]["status"] == "no_layout_subjects"
     assert data["measures"] == []
     assert "validation" in data
     assert data["validation"]["validation_status"] == "pending"
@@ -143,7 +156,14 @@ def test_musicxml_without_namespace_imports_measures():
     assert data["source"]["omr_status"] == "musicxml_parsed"
     assert_ocr_contract(data, "not_applicable")
     assert_fusion_contract(data)
+    assert_layout_contract(data)
     assert data["fusion"]["status"] == "no_ocr_text"
+    assert data["layout"]["status"] == "geometry_unavailable"
+    assert data["layout"]["page_count"] == 1
+    assert data["layout"]["system_count"] == 1
+    assert data["layout"]["pages"][0]["geometry_status"] == "unavailable_no_reliable_layout_geometry"
+    assert data["layout"]["systems"][0]["geometry_status"] == "unavailable_no_reliable_layout_geometry"
+    assert data["systems"][0]["geometry"]["bbox"] is None
     assert data["music"]["title"] == "Teste sem namespace"
     assert data["music"]["meter_default"] == "3/4"
     assert len(data["measures"]) == 1
@@ -164,6 +184,7 @@ def test_mxl_package_imports_measures():
     assert data["source"]["omr_status"] == "musicxml_parsed"
     assert_ocr_contract(data, "not_applicable")
     assert_fusion_contract(data)
+    assert_layout_contract(data)
     assert len(data["measures"]) == 1
     assert data["systems"][0]["detected_summary"]["measure_count"] == 1
 
@@ -189,6 +210,7 @@ def test_image_google_vision_adc_failure_is_reported(monkeypatch):
     assert data["source"]["file_type"] == "png"
     assert_ocr_contract(data, "failed")
     assert_fusion_contract(data)
+    assert_layout_contract(data)
     assert data["ocr"]["engine"] == "google_vision"
     assert "gcloud auth application-default login" in data["ocr"]["warnings"][0]
     assert data["measures"] == []
@@ -212,6 +234,7 @@ def test_pdf_google_vision_without_page_conversion_remains_unavailable(monkeypat
     assert data["source"]["file_type"] == "pdf"
     assert_ocr_contract(data, "unavailable")
     assert_fusion_contract(data)
+    assert_layout_contract(data)
     assert data["ocr"]["engine"] == "google_vision"
     assert "PDF local exige conversão" in data["ocr"]["warnings"][0]
     assert data["measures"] == []
@@ -255,6 +278,7 @@ def test_image_google_vision_success_with_mocked_json_credentials(monkeypatch, t
     assert data["source"]["file_type"] == "png"
     assert_ocr_contract(data, "success")
     assert_fusion_contract(data)
+    assert_layout_contract(data)
     assert data["ocr"]["engine"] == "google_vision"
     assert data["ocr"]["text_blocks"][0]["text"] == "Am"
     assert data["source"]["ocr_status"] == "success"
@@ -293,6 +317,7 @@ def test_image_google_vision_success_with_mocked_adc(monkeypatch):
     assert data["source"]["file_type"] == "jpg"
     assert_ocr_contract(data, "success")
     assert_fusion_contract(data)
+    assert_layout_contract(data)
     assert data["ocr"]["engine"] == "google_vision"
     assert data["ocr"]["text_blocks"][0]["text"] == "Glória"
     assert "Application Default Credentials" in data["ocr"]["warnings"][0]
