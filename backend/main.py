@@ -12,7 +12,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from association_engine import sync_ocr_system_associations
+from association_engine import sync_ocr_measure_associations, sync_ocr_system_associations
 from fusion_engine import sync_initial_fusion
 from geometry_engine import sync_layout_geometry
 from musicxml_parser import parse_musicxml_to_cpp
@@ -155,7 +155,8 @@ def sanitize_filename(name: str) -> str:
 def finalize_protocol(protocol: dict[str, Any]) -> dict[str, Any]:
     protocol = sync_layout_geometry(protocol)
     protocol = sync_initial_fusion(protocol)
-    return sync_ocr_system_associations(protocol)
+    protocol = sync_ocr_system_associations(protocol)
+    return sync_ocr_measure_associations(protocol)
 
 
 def make_base_protocol(
