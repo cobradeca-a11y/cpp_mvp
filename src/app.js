@@ -8,11 +8,12 @@ import { generatePlayableChordSheet } from "./modules/chord-sheet-playable.js";
 import { globalUncertaintyReport } from "./modules/confidence-engine.js";
 import { downloadText, versioned } from "./modules/export-output.js";
 
-const FRONTEND_BUILD = "audit-28-cache-v1";
+const FRONTEND_BUILD = "audit-35-cache-v1";
 
 let protocol = loadProtocol();
 let selectedFile = null;
 let currentMeasureIndex = 0;
+let currentOcrBlockIndex = 0;
 
 const $ = id => document.getElementById(id);
 
@@ -29,6 +30,21 @@ function persist() {
 
 function setStatus(message) {
   $("processingStatus").textContent = message;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function formatJson(value) {
+  if (value === undefined || value === null || value === "") return "—";
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return escapeHtml(value);
+  return `<pre class="inline-json">${escapeHtml(JSON.stringify(value, null, 2))}</pre>`;
 }
 
 function formatClassificationCounts(fusion) {
@@ -59,6 +75,8 @@ function buildProcessingSummary(protocol) {
   const source = protocol.source || {};
   const ocr = protocol.ocr || {};
   const fusion = protocol.fusion || {};
+  const layout = protocol.layout || {};
+  const alignment = protocol.alignment_report || {};
   const measures = protocol.measures?.length || 0;
   const textBlocks = ocr.text_blocks?.length || 0;
   const possibleChords = fusion.possible_chords?.length || 0;
@@ -77,6 +95,8 @@ function buildProcessingSummary(protocol) {
 
   if (fusion.engine) lines.push(`Motor Fusion: ${fusion.engine}`);
   if (fusion.version) lines.push(`Versão Fusion: ${fusion.version}`);
+  if (layout.version) lines.push(`Layout: ${layout.version} — ${layout.status || "not_available"}`);
+  if (alignment.version) lines.push(`Relatório de alinhamento: ${alignment.version} — ${alignment.status || "not_available"}`);
   if (possibleChords || possibleLyrics) {
     lines.push(`Candidatos OCR: ${possibleChords} cifra(s), ${possibleLyrics} texto(s)/sílaba(s).`);
   }
@@ -84,6 +104,10 @@ function buildProcessingSummary(protocol) {
   if (fusion.warnings?.length) {
     lines.push("Avisos Fusion:");
     fusion.warnings.forEach(w => lines.push(`- ${w}`));
+  }
+  if (alignment.blockers?.length) {
+    lines.push("Bloqueios de alinhamento:");
+    alignment.blockers.forEach(b => lines.push(`- ${b.code}: ${b.message}`));
   }
   if (ocr.warnings?.length) {
     lines.push("Avisos OCR:");
@@ -109,8 +133,8 @@ function refreshReview() {
   protocol.measures.forEach((m, index) => {
     const div = document.createElement("div");
     div.className = `item ${index === currentMeasureIndex ? "active" : ""}`;
-    div.innerHTML = `<div class="row"><b>Compasso ${m.number}</b><span>${m.confidence || "provável"}</span></div>
-      <small>${m.meter || ""} — ${m.review_status || "pending"}</small>`;
+    div.innerHTML = `<div class="row"><b>Compasso ${escapeHtml(m.number)}</b><span>${escapeHtml(m.confidence || "provável")}</span></div>
+      <small>${escapeHtml(m.meter || "")} — ${escapeHtml(m.review_status || "pending")}</small>`;
     div.onclick = () => {
       currentMeasureIndex = index;
       refreshReview();
@@ -119,6 +143,121 @@ function refreshReview() {
   });
 
   $("measureFeedback").textContent = measureFeedback(currentMeasure());
+}
+
+function getOcrBlocks() {
+  return protocol.fusion?.text_blocks_index || [];
+}
+
+function findRegionForBlock(block) {
+  const blockId = block?.fusion_id;
+  if (!blockId) return null;
+  return (protocol.fusion?.text_region_groups || []).find(region => Array.isArray(region.text_block_ids) && region.text_block_ids.includes(blockId)) || null;
+}
+
+function findSystemAssociation(region) {
+  const regionId = region?.region_id;
+  if (!regionId) return null;
+  return (protocol.ocr_system_associations?.associations || []).find(item => item.region_id === regionId) || null;
+}
+
+function findMeasureAssociation(region) {
+  const regionId = region?.region_id;
+  if (!regionId) return null;
+  return (protocol.ocr_measure_associations?.associations || []).find(item => item.region_id === regionId) || null;
+}
+
+function currentOcrBlock() {
+  return getOcrBlocks()[currentOcrBlockIndex] || null;
+}
+
+function renderOcrBlockDetails(block) {
+  if (!block) return "Nenhum bloco OCR carregado.";
+
+  const region = findRegionForBlock(block);
+  const systemAssociation = findSystemAssociation(region);
+  const measureAssociation = findMeasureAssociation(region);
+  const chordAnalysis = block.chord_analysis || null;
+
+  return `
+    <div class="ocr-detail-grid">
+      <div><span class="detail-label">ID</span><strong>${escapeHtml(block.fusion_id || "—")}</strong></div>
+      <div><span class="detail-label">Página</span><strong>${escapeHtml(block.page || "—")}</strong></div>
+      <div><span class="detail-label">Classificação</span><strong>${escapeHtml(block.classification || "—")}</strong></div>
+      <div><span class="detail-label">Normalização</span><strong>${escapeHtml(block.normalization_status || "—")}</strong></div>
+    </div>
+
+    <h4>Texto OCR bruto preservado</h4>
+    <pre class="ocr-raw">${escapeHtml(block.text || "")}</pre>
+
+    <h4>Texto normalizado conservador</h4>
+    <pre class="ocr-normalized">${escapeHtml(block.normalized_text || "")}</pre>
+
+    <h4>Região funcional</h4>
+    <div class="evidence-box">
+      <p><b>Região:</b> ${escapeHtml(region?.region_id || "não localizada")}</p>
+      <p><b>Tipo:</b> ${escapeHtml(region?.region_type || "—")}</p>
+      <p><b>Confiança:</b> ${escapeHtml(region?.confidence || "—")}</p>
+      <p><b>Motivo:</b> ${escapeHtml(region?.reason || "—")}</p>
+    </div>
+
+    <h4>Associação OCR→sistema</h4>
+    <div class="evidence-box blocked-box">
+      <p><b>Status:</b> ${escapeHtml(systemAssociation?.association_status || "não disponível")}</p>
+      <p><b>Sistema candidato:</b> ${escapeHtml(systemAssociation?.candidate_system_id || "—")}</p>
+      <p><b>Motivo:</b> ${escapeHtml(systemAssociation?.reason || "—")}</p>
+    </div>
+
+    <h4>Associação OCR→compasso</h4>
+    <div class="evidence-box blocked-box">
+      <p><b>Status:</b> ${escapeHtml(measureAssociation?.association_status || "não disponível")}</p>
+      <p><b>Compasso candidato:</b> ${escapeHtml(measureAssociation?.candidate_measure_number || "—")}</p>
+      <p><b>Confiança:</b> ${escapeHtml(measureAssociation?.confidence_score ?? "—")} / ${escapeHtml(measureAssociation?.confidence_level || "—")}</p>
+      <p><b>Motivo:</b> ${escapeHtml(measureAssociation?.reason || "—")}</p>
+    </div>
+
+    <h4>Análise de cifra candidata</h4>
+    ${formatJson(chordAnalysis)}
+
+    <h4>BBox OCR</h4>
+    ${formatJson(block.bbox || {})}
+
+    <h4>Notas de normalização</h4>
+    ${formatJson(block.normalization_notes || [])}
+  `;
+}
+
+function refreshOcrReview() {
+  const list = $("ocrBlocksList");
+  const details = $("ocrBlockDetails");
+  if (!list || !details) return;
+
+  const blocks = getOcrBlocks();
+  list.innerHTML = "";
+
+  if (!blocks.length) {
+    currentOcrBlockIndex = 0;
+    details.textContent = "Nenhum bloco OCR carregado. Processe uma imagem/PDF com OCR ou importe protocolo com fusion.text_blocks_index.";
+    return;
+  }
+
+  currentOcrBlockIndex = Math.min(Math.max(currentOcrBlockIndex, 0), blocks.length - 1);
+
+  blocks.forEach((block, index) => {
+    const region = findRegionForBlock(block);
+    const measureAssociation = findMeasureAssociation(region);
+    const div = document.createElement("div");
+    div.className = `item ${index === currentOcrBlockIndex ? "active" : ""}`;
+    div.innerHTML = `<div class="row"><b>${escapeHtml(block.text || "[vazio]")}</b><span>${escapeHtml(block.classification || "—")}</span></div>
+      <small>${escapeHtml(block.fusion_id || "")}${region?.region_type ? ` — ${escapeHtml(region.region_type)}` : ""}${measureAssociation?.association_status ? ` — ${escapeHtml(measureAssociation.association_status)}` : ""}</small>`;
+    div.onclick = () => {
+      currentOcrBlockIndex = index;
+      refreshOcrReview();
+    };
+    list.appendChild(div);
+  });
+
+  details.innerHTML = renderOcrBlockDetails(currentOcrBlock());
 }
 
 function fileBaseName(fileName = "") {
@@ -206,10 +345,12 @@ async function processWithProfessionalOmr() {
     protocol = result || createInitialProtocol();
     syncMusicMetadataFromImport(selectedFile);
     currentMeasureIndex = 0;
+    currentOcrBlockIndex = 0;
     persist();
 
     setStatus(buildProcessingSummary(protocol));
     refreshReview();
+    refreshOcrReview();
     generateOutputs();
     toast("Processamento profissional concluído.");
   } catch (err) {
@@ -274,6 +415,24 @@ function initEvents() {
     refreshReview();
   };
 
+  if ($("btnPrevOcrBlock")) {
+    $("btnPrevOcrBlock").onclick = () => {
+      const blocks = getOcrBlocks();
+      if (!blocks.length) return;
+      currentOcrBlockIndex = Math.max(0, currentOcrBlockIndex - 1);
+      refreshOcrReview();
+    };
+  }
+
+  if ($("btnNextOcrBlock")) {
+    $("btnNextOcrBlock").onclick = () => {
+      const blocks = getOcrBlocks();
+      if (!blocks.length) return;
+      currentOcrBlockIndex = Math.min(blocks.length - 1, currentOcrBlockIndex + 1);
+      refreshOcrReview();
+    };
+  }
+
   $("btnAcceptMeasure").onclick = () => {
     const m = currentMeasure();
     if (!m) return;
@@ -310,8 +469,9 @@ function initEvents() {
     downloadText(versioned("relatorio_deteccao", "txt"), protocol.outputs.detection_report);
   };
 
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js?v=audit-28-cache-v1").catch(() => {});
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js?v=audit-35-cache-v1").catch(() => {});
   refreshReview();
+  refreshOcrReview();
   generateOutputs();
 }
 
