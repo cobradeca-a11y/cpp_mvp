@@ -144,3 +144,81 @@ def test_mxl_package_imports_measures():
     assert_ocr_contract(data, "not_applicable")
     assert len(data["measures"]) == 1
     assert data["systems"][0]["detected_summary"]["measure_count"] == 1
+
+
+def test_image_returns_unavailable_when_google_vision_missing_credentials(monkeypatch):
+    monkeypatch.setattr(main, "audiveris_available", lambda: False)
+    monkeypatch.setenv("OCR_ENGINE", "google_vision")
+    monkeypatch.delenv("GOOGLE_APPLICATION_CREDENTIALS", raising=False)
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/omr/analyze",
+        files={"file": ("sample.png", b"\x89PNG\r\n\x1a\nfake", "image/png")},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["source"]["file_type"] == "png"
+    assert_ocr_contract(data, "unavailable")
+    assert data["ocr"]["engine"] == "google_vision"
+    assert "GOOGLE_APPLICATION_CREDENTIALS" in data["ocr"]["warnings"][0]
+    assert data["measures"] == []
+
+
+def test_pdf_google_vision_without_page_conversion_remains_unavailable(monkeypatch, tmp_path):
+    monkeypatch.setattr(main, "audiveris_available", lambda: False)
+    monkeypatch.setenv("OCR_ENGINE", "google_vision")
+    credentials = tmp_path / "gcp.json"
+    credentials.write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", str(credentials))
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/omr/analyze",
+        files={"file": ("sample.pdf", b"%PDF-1.4\n%fake\n", "application/pdf")},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["source"]["file_type"] == "pdf"
+    assert_ocr_contract(data, "unavailable")
+    assert data["ocr"]["engine"] == "google_vision"
+    assert "PDF local exige conversão" in data["ocr"]["warnings"][0]
+    assert data["measures"] == []
+
+
+def test_image_google_vision_success_with_mock(monkeypatch, tmp_path):
+    monkeypatch.setattr(main, "audiveris_available", lambda: False)
+    monkeypatch.setenv("OCR_ENGINE", "google_vision")
+    monkeypatch.setenv("OCR_FEATURE", "DOCUMENT_TEXT_DETECTION")
+    credentials = tmp_path / "gcp.json"
+    credentials.write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", str(credentials))
+    monkeypatch.setattr(
+        "ocr_engine._run_google_vision_image",
+        lambda *_args, **_kwargs: [
+            {
+                "text": "Am",
+                "confidence": 0.0,
+                "bbox": {"vertices": [{"x": 1, "y": 2}, {"x": 3, "y": 2}, {"x": 3, "y": 4}, {"x": 1, "y": 4}]},
+                "page": 1,
+                "source": "ocr",
+            }
+        ],
+    )
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/omr/analyze",
+        files={"file": ("sample.png", b"\x89PNG\r\n\x1a\nfake", "image/png")},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["source"]["file_type"] == "png"
+    assert_ocr_contract(data, "success")
+    assert data["ocr"]["engine"] == "google_vision"
+    assert data["ocr"]["text_blocks"][0]["text"] == "Am"
+    assert data["source"]["ocr_status"] == "success"
+    assert data["measures"] == []
