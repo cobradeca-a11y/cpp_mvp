@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-ASSOCIATION_VERSION = "audit-31"
+SYSTEM_ASSOCIATION_VERSION = "audit-31"
+MEASURE_ASSOCIATION_VERSION = "audit-32"
 BLOCKED_NO_GEOMETRY_STATUS = "blocked_no_reliable_layout_geometry"
+BLOCKED_NO_SYSTEM_STATUS = "blocked_no_system_association"
+BLOCKED_NO_MEASURE_GEOMETRY_STATUS = "blocked_no_reliable_measure_geometry"
 UNASSIGNED_STATUS = "unassigned_no_musicxml_layout"
 
 
@@ -24,14 +27,41 @@ def sync_ocr_system_associations(protocol: dict[str, Any]) -> dict[str, Any]:
 
     protocol["ocr_system_associations"] = {
         "engine": "cpp_ocr_system_association_contract",
-        "version": ASSOCIATION_VERSION,
+        "version": SYSTEM_ASSOCIATION_VERSION,
         "status": association_status(associations),
         "association_count": len(associations),
         "assigned_count": sum(1 for item in associations if item.get("association_status") == "assigned_to_system"),
         "blocked_count": sum(1 for item in associations if item.get("association_status") == BLOCKED_NO_GEOMETRY_STATUS),
         "unassigned_count": sum(1 for item in associations if item.get("association_status") == UNASSIGNED_STATUS),
         "associations": associations,
-        "warnings": association_warnings(associations),
+        "warnings": association_warnings(associations, "sistema"),
+    }
+    return protocol
+
+
+def sync_ocr_measure_associations(protocol: dict[str, Any]) -> dict[str, Any]:
+    """Attach conservative OCR-to-measure association evidence.
+
+    Audit 32 must not invent approximate measure mapping. If OCR→system is
+    blocked or no reliable measure geometry exists, every OCR region remains
+    blocked with an explicit reason.
+    """
+    system_contract = protocol.get("ocr_system_associations") if isinstance(protocol.get("ocr_system_associations"), dict) else {}
+    system_associations = system_contract.get("associations") if isinstance(system_contract.get("associations"), list) else []
+    measures = protocol.get("measures") if isinstance(protocol.get("measures"), list) else []
+
+    associations = [build_region_measure_association(item, measures) for item in system_associations]
+
+    protocol["ocr_measure_associations"] = {
+        "engine": "cpp_ocr_measure_association_contract",
+        "version": MEASURE_ASSOCIATION_VERSION,
+        "status": measure_association_status(associations),
+        "association_count": len(associations),
+        "assigned_count": sum(1 for item in associations if item.get("association_status") == "assigned_to_measure"),
+        "blocked_count": sum(1 for item in associations if str(item.get("association_status", "")).startswith("blocked_")),
+        "unassigned_count": sum(1 for item in associations if item.get("association_status") == UNASSIGNED_STATUS),
+        "associations": associations,
+        "warnings": measure_association_warnings(associations),
     }
     return protocol
 
@@ -59,12 +89,48 @@ def build_region_system_association(region: dict[str, Any], layout_systems: list
             "reason": "OCR→sistema bloqueado: região OCR ou sistema musical sem bbox/layout confiável.",
         }
 
-    # Conservative placeholder for future audits: geometry exists, but Audit 31
-    # still does not implement matching heuristics. It only proves the contract.
     return {
         **base,
         "association_status": UNASSIGNED_STATUS,
         "reason": "Geometria disponível, mas associação automática ainda não implementada nesta auditoria.",
+    }
+
+
+def build_region_measure_association(system_association: dict[str, Any], measures: list[dict[str, Any]]) -> dict[str, Any]:
+    base = {
+        "region_id": system_association.get("region_id"),
+        "region_type": system_association.get("region_type"),
+        "page": system_association.get("page", 1),
+        "text": system_association.get("text", ""),
+        "normalized_text": system_association.get("normalized_text", ""),
+        "candidate_system_id": system_association.get("candidate_system_id"),
+        "candidate_measure_id": None,
+        "candidate_measure_number": None,
+        "association_status": UNASSIGNED_STATUS,
+        "confidence": "none",
+        "reason": "no_measure_association_attempted_without_system_and_measure_geometry",
+    }
+
+    if system_association.get("association_status") != "assigned_to_system":
+        return {
+            **base,
+            "association_status": BLOCKED_NO_SYSTEM_STATUS,
+            "reason": "OCR→compasso bloqueado: região OCR ainda não possui associação confiável com sistema musical.",
+        }
+
+    system_id = system_association.get("candidate_system_id")
+    measure_candidates = reliable_measures_for_system(measures, system_id)
+    if not measure_candidates:
+        return {
+            **base,
+            "association_status": BLOCKED_NO_MEASURE_GEOMETRY_STATUS,
+            "reason": "OCR→compasso bloqueado: não há bbox/geometria confiável de compasso no sistema candidato.",
+        }
+
+    return {
+        **base,
+        "association_status": UNASSIGNED_STATUS,
+        "reason": "Geometria de sistema/compasso disponível, mas associação automática ainda não implementada nesta auditoria.",
     }
 
 
@@ -75,6 +141,18 @@ def reliable_systems_for_page(layout_systems: list[dict[str, Any]], page: int) -
             continue
         if system.get("geometry_status") == "available" and isinstance(system.get("bbox"), dict):
             out.append(system)
+    return out
+
+
+def reliable_measures_for_system(measures: list[dict[str, Any]], system_id: Any) -> list[dict[str, Any]]:
+    out = []
+    for measure in measures:
+        if system_id and measure.get("system_id") not in {None, system_id}:
+            continue
+        geometry = measure.get("geometry") if isinstance(measure.get("geometry"), dict) else {}
+        bbox = geometry.get("bbox") if isinstance(geometry, dict) else None
+        if geometry.get("status") == "available" and isinstance(bbox, dict):
+            out.append(measure)
     return out
 
 
@@ -100,10 +178,33 @@ def association_status(associations: list[dict[str, Any]]) -> str:
     return "unassigned_pending_geometry_or_review"
 
 
-def association_warnings(associations: list[dict[str, Any]]) -> list[str]:
+def measure_association_status(associations: list[dict[str, Any]]) -> str:
+    if not associations:
+        return "no_ocr_regions"
+    if all(item.get("association_status") == BLOCKED_NO_SYSTEM_STATUS for item in associations):
+        return "blocked_no_system_association"
+    if all(str(item.get("association_status", "")).startswith("blocked_") for item in associations):
+        return "blocked_no_reliable_measure_geometry"
+    if any(item.get("association_status") == "assigned_to_measure" for item in associations):
+        return "partially_assigned"
+    return "unassigned_pending_geometry_or_review"
+
+
+def association_warnings(associations: list[dict[str, Any]], target: str) -> list[str]:
     warnings = []
     if not associations:
-        warnings.append("Nenhuma região OCR disponível para associação com sistema musical.")
+        warnings.append(f"Nenhuma região OCR disponível para associação com {target} musical.")
     if any(item.get("association_status") == BLOCKED_NO_GEOMETRY_STATUS for item in associations):
         warnings.append("Associação OCR→sistema bloqueada enquanto não houver geometria confiável de página/sistema.")
+    return warnings
+
+
+def measure_association_warnings(associations: list[dict[str, Any]]) -> list[str]:
+    warnings = []
+    if not associations:
+        warnings.append("Nenhuma região OCR disponível para associação com compasso.")
+    if any(item.get("association_status") == BLOCKED_NO_SYSTEM_STATUS for item in associations):
+        warnings.append("Associação OCR→compasso bloqueada enquanto OCR→sistema não estiver confiável.")
+    if any(item.get("association_status") == BLOCKED_NO_MEASURE_GEOMETRY_STATUS for item in associations):
+        warnings.append("Associação OCR→compasso bloqueada enquanto não houver geometria confiável de compasso.")
     return warnings
