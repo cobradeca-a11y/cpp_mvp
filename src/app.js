@@ -8,7 +8,7 @@ import { generatePlayableChordSheet } from "./modules/chord-sheet-playable.js";
 import { globalUncertaintyReport } from "./modules/confidence-engine.js";
 import { downloadText, versioned } from "./modules/export-output.js";
 
-const FRONTEND_BUILD = "audit-35-cache-v1";
+const FRONTEND_BUILD = "audit-36-cache-v1";
 
 let protocol = loadProtocol();
 let selectedFile = null;
@@ -171,6 +171,61 @@ function currentOcrBlock() {
   return getOcrBlocks()[currentOcrBlockIndex] || null;
 }
 
+function makeHumanReviewDecision(block, decision) {
+  const reviewedAt = new Date().toISOString();
+  const review = {
+    review_id: `ocr-classification-${block.fusion_id}-${Date.now()}`,
+    audit: "audit-36",
+    type: "ocr_classification_review",
+    target_type: "fusion_text_block",
+    target_id: block.fusion_id,
+    decision,
+    original_text: block.text,
+    normalized_text: block.normalized_text,
+    original_classification: block.classification,
+    reviewed_by: "human_local_review",
+    reviewed_at: reviewedAt,
+    effects: {
+      text_changed: false,
+      normalized_text_changed: false,
+      classification_changed: false,
+      system_assignment_changed: false,
+      measure_assignment_changed: false,
+    },
+  };
+
+  protocol.review = Array.isArray(protocol.review) ? protocol.review : [];
+  protocol.review.push(review);
+  block.human_review = {
+    status: decision === "approved" ? "classification_approved" : "classification_rejected",
+    decision,
+    reviewed_at: reviewedAt,
+    review_id: review.review_id,
+  };
+  persist();
+  refreshOcrReview();
+  generateOutputs();
+  toast(decision === "approved" ? "Classificação OCR aprovada." : "Classificação OCR rejeitada.");
+}
+
+function approveCurrentOcrClassification() {
+  const block = currentOcrBlock();
+  if (!block) {
+    toast("Nenhum bloco OCR para aprovar.");
+    return;
+  }
+  makeHumanReviewDecision(block, "approved");
+}
+
+function rejectCurrentOcrClassification() {
+  const block = currentOcrBlock();
+  if (!block) {
+    toast("Nenhum bloco OCR para rejeitar.");
+    return;
+  }
+  makeHumanReviewDecision(block, "rejected");
+}
+
 function renderOcrBlockDetails(block) {
   if (!block) return "Nenhum bloco OCR carregado.";
 
@@ -178,6 +233,7 @@ function renderOcrBlockDetails(block) {
   const systemAssociation = findSystemAssociation(region);
   const measureAssociation = findMeasureAssociation(region);
   const chordAnalysis = block.chord_analysis || null;
+  const humanReview = block.human_review || null;
 
   return `
     <div class="ocr-detail-grid">
@@ -185,6 +241,14 @@ function renderOcrBlockDetails(block) {
       <div><span class="detail-label">Página</span><strong>${escapeHtml(block.page || "—")}</strong></div>
       <div><span class="detail-label">Classificação</span><strong>${escapeHtml(block.classification || "—")}</strong></div>
       <div><span class="detail-label">Normalização</span><strong>${escapeHtml(block.normalization_status || "—")}</strong></div>
+    </div>
+
+    <h4>Revisão humana da classificação</h4>
+    <div class="evidence-box human-review-box">
+      <p><b>Status:</b> ${escapeHtml(humanReview?.status || "pendente")}</p>
+      <p><b>Decisão:</b> ${escapeHtml(humanReview?.decision || "—")}</p>
+      <p><b>Review ID:</b> ${escapeHtml(humanReview?.review_id || "—")}</p>
+      <p><b>Data:</b> ${escapeHtml(humanReview?.reviewed_at || "—")}</p>
     </div>
 
     <h4>Texto OCR bruto preservado</h4>
@@ -246,10 +310,11 @@ function refreshOcrReview() {
   blocks.forEach((block, index) => {
     const region = findRegionForBlock(block);
     const measureAssociation = findMeasureAssociation(region);
+    const reviewStatus = block.human_review?.status || "pendente";
     const div = document.createElement("div");
     div.className = `item ${index === currentOcrBlockIndex ? "active" : ""}`;
     div.innerHTML = `<div class="row"><b>${escapeHtml(block.text || "[vazio]")}</b><span>${escapeHtml(block.classification || "—")}</span></div>
-      <small>${escapeHtml(block.fusion_id || "")}${region?.region_type ? ` — ${escapeHtml(region.region_type)}` : ""}${measureAssociation?.association_status ? ` — ${escapeHtml(measureAssociation.association_status)}` : ""}</small>`;
+      <small>${escapeHtml(block.fusion_id || "")}${region?.region_type ? ` — ${escapeHtml(region.region_type)}` : ""}${measureAssociation?.association_status ? ` — ${escapeHtml(measureAssociation.association_status)}` : ""} — revisão: ${escapeHtml(reviewStatus)}</small>`;
     div.onclick = () => {
       currentOcrBlockIndex = index;
       refreshOcrReview();
@@ -433,6 +498,14 @@ function initEvents() {
     };
   }
 
+  if ($("btnApproveOcrClassification")) {
+    $("btnApproveOcrClassification").onclick = approveCurrentOcrClassification;
+  }
+
+  if ($("btnRejectOcrClassification")) {
+    $("btnRejectOcrClassification").onclick = rejectCurrentOcrClassification;
+  }
+
   $("btnAcceptMeasure").onclick = () => {
     const m = currentMeasure();
     if (!m) return;
@@ -469,7 +542,7 @@ function initEvents() {
     downloadText(versioned("relatorio_deteccao", "txt"), protocol.outputs.detection_report);
   };
 
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js?v=audit-35-cache-v1").catch(() => {});
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js?v=audit-36-cache-v1").catch(() => {});
   refreshReview();
   refreshOcrReview();
   generateOutputs();
