@@ -66,6 +66,17 @@ def assert_ocr_contract(data, expected_status):
     assert isinstance(data["ocr"]["warnings"], list)
 
 
+def assert_fusion_contract(data):
+    assert "fusion" in data
+    assert data["fusion"]["engine"] == "initial_musicxml_ocr_fusion"
+    assert data["fusion"]["version"] == "audit-23"
+    assert isinstance(data["fusion"]["text_blocks_index"], list)
+    assert isinstance(data["fusion"]["possible_chords"], list)
+    assert isinstance(data["fusion"]["possible_lyrics"], list)
+    assert isinstance(data["fusion"]["possible_navigation"], list)
+    assert isinstance(data["fusion"]["warnings"], list)
+
+
 def test_health_endpoint():
     client = TestClient(app)
     response = client.get("/health")
@@ -95,9 +106,11 @@ def test_pdf_returns_professional_protocol_when_audiveris_unavailable(monkeypatc
     assert data["source"]["omr_engine"] == "Audiveris"
     assert data["source"]["validation_status"] == "pending"
     assert_ocr_contract(data, "unavailable")
+    assert_fusion_contract(data)
     assert data["ocr"]["text_blocks"] == []
     assert data["ocr"]["possible_chords"] == []
     assert data["ocr"]["possible_lyrics"] == []
+    assert data["fusion"]["status"] == "no_ocr_text"
     assert data["measures"] == []
     assert "validation" in data
     assert data["validation"]["validation_status"] == "pending"
@@ -123,6 +136,8 @@ def test_musicxml_without_namespace_imports_measures():
     assert data["source"]["file_type"] == "musicxml"
     assert data["source"]["omr_status"] == "musicxml_parsed"
     assert_ocr_contract(data, "not_applicable")
+    assert_fusion_contract(data)
+    assert data["fusion"]["status"] == "no_ocr_text"
     assert data["music"]["title"] == "Teste sem namespace"
     assert data["music"]["meter_default"] == "3/4"
     assert len(data["measures"]) == 1
@@ -142,6 +157,7 @@ def test_mxl_package_imports_measures():
     assert data["source"]["file_type"] == "mxl"
     assert data["source"]["omr_status"] == "musicxml_parsed"
     assert_ocr_contract(data, "not_applicable")
+    assert_fusion_contract(data)
     assert len(data["measures"]) == 1
     assert data["systems"][0]["detected_summary"]["measure_count"] == 1
 
@@ -166,6 +182,7 @@ def test_image_google_vision_adc_failure_is_reported(monkeypatch):
     data = response.json()
     assert data["source"]["file_type"] == "png"
     assert_ocr_contract(data, "failed")
+    assert_fusion_contract(data)
     assert data["ocr"]["engine"] == "google_vision"
     assert "gcloud auth application-default login" in data["ocr"]["warnings"][0]
     assert data["measures"] == []
@@ -188,6 +205,7 @@ def test_pdf_google_vision_without_page_conversion_remains_unavailable(monkeypat
     data = response.json()
     assert data["source"]["file_type"] == "pdf"
     assert_ocr_contract(data, "unavailable")
+    assert_fusion_contract(data)
     assert data["ocr"]["engine"] == "google_vision"
     assert "PDF local exige conversão" in data["ocr"]["warnings"][0]
     assert data["measures"] == []
@@ -209,7 +227,14 @@ def test_image_google_vision_success_with_mocked_json_credentials(monkeypatch, t
                 "bbox": {"vertices": [{"x": 1, "y": 2}, {"x": 3, "y": 2}, {"x": 3, "y": 4}, {"x": 1, "y": 4}]},
                 "page": 1,
                 "source": "ocr",
-            }
+            },
+            {
+                "text": "Glória",
+                "confidence": 0.0,
+                "bbox": {"vertices": [{"x": 10, "y": 20}, {"x": 30, "y": 20}, {"x": 30, "y": 40}, {"x": 10, "y": 40}]},
+                "page": 1,
+                "source": "ocr",
+            },
         ],
     )
 
@@ -223,10 +248,15 @@ def test_image_google_vision_success_with_mocked_json_credentials(monkeypatch, t
     data = response.json()
     assert data["source"]["file_type"] == "png"
     assert_ocr_contract(data, "success")
+    assert_fusion_contract(data)
     assert data["ocr"]["engine"] == "google_vision"
     assert data["ocr"]["text_blocks"][0]["text"] == "Am"
     assert data["source"]["ocr_status"] == "success"
     assert data["measures"] == []
+    assert data["fusion"]["status"] == "ocr_only_no_measures"
+    assert data["fusion"]["possible_chords"][0]["text"] == "Am"
+    assert data["fusion"]["possible_lyrics"][0]["text"] == "Glória"
+    assert data["fusion"]["text_blocks_index"][0]["assignment"]["measure_id"] is None
 
 
 def test_image_google_vision_success_with_mocked_adc(monkeypatch):
@@ -256,6 +286,7 @@ def test_image_google_vision_success_with_mocked_adc(monkeypatch):
     data = response.json()
     assert data["source"]["file_type"] == "jpg"
     assert_ocr_contract(data, "success")
+    assert_fusion_contract(data)
     assert data["ocr"]["engine"] == "google_vision"
     assert data["ocr"]["text_blocks"][0]["text"] == "Glória"
     assert "Application Default Credentials" in data["ocr"]["warnings"][0]
