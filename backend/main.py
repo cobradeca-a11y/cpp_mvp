@@ -12,6 +12,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from fusion_engine import sync_initial_fusion
 from musicxml_parser import parse_musicxml_to_cpp
 from ocr_engine import build_ocr_contract, sync_ocr_contract
 
@@ -190,7 +191,8 @@ def make_base_protocol(
             "detection_report": "",
         },
     }
-    return sync_ocr_contract(protocol, ocr_contract or build_ocr_contract(source_name=filename, file_type=protocol["source"]["file_type"]))
+    protocol = sync_ocr_contract(protocol, ocr_contract or build_ocr_contract(source_name=filename, file_type=protocol["source"]["file_type"]))
+    return sync_initial_fusion(protocol)
 
 
 def normalize_professional_protocol(
@@ -216,4 +218,5 @@ def normalize_professional_protocol(
     merged.setdefault("systems", [])
     merged.setdefault("measures", [])
     merged.setdefault("review", [])
-    return sync_ocr_contract(merged, ocr_contract or merged.get("ocr") or base.get("ocr"))
+    merged = sync_ocr_contract(merged, ocr_contract or merged.get("ocr") or base.get("ocr"))
+    return sync_initial_fusion(merged)
