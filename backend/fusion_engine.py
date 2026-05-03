@@ -69,10 +69,6 @@ CONTINUATION_TOKENS = {"-", "–", "—", "_"}
 MUSIC_SYMBOL_NOISE_TOKENS = {"។", "·", "•", "*"}
 
 
-LYRIC_FRAGMENT_RE = re.compile(r"^[A-Za-zÀ-ÖØ-öø-ÿ]{2,4}$")
-LYRIC_WORD_RE = re.compile(r"^[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'’\-]*$")
-
-
 def build_initial_fusion(protocol: dict[str, Any]) -> dict[str, Any]:
     """Build a conservative MusicXML + OCR evidence index.
 
@@ -170,11 +166,10 @@ def sync_initial_fusion(protocol: dict[str, Any]) -> dict[str, Any]:
 
 def classify_ocr_text(text: str) -> str:
     raw = text.strip()
-    cleaned = normalize_token(raw)
-    compact = compact_token(raw)
-
-    if not raw or not cleaned:
+    if not raw:
         return "unknown"
+
+    compact = compact_token(raw)
 
     if raw in PUNCTUATION_TOKENS or compact in PUNCTUATION_TOKENS:
         return "punctuation"
@@ -187,6 +182,10 @@ def classify_ocr_text(text: str) -> str:
 
     if is_music_symbol_noise(raw):
         return "music_symbol_noise"
+
+    cleaned = normalize_token(raw)
+    if not cleaned:
+        return "unknown"
 
     if is_instrument_label(cleaned):
         return "instrument_label"
@@ -221,6 +220,20 @@ def has_letter(text: str) -> bool:
     return any(ch.isalpha() for ch in text)
 
 
+def is_unicode_alpha_token(text: str, *, allow_internal_hyphen: bool = False) -> bool:
+    if not text:
+        return False
+
+    for idx, ch in enumerate(text):
+        if ch.isalpha():
+            continue
+        if allow_internal_hyphen and ch in {"-", "’", "'"} and 0 < idx < len(text) - 1:
+            continue
+        return False
+
+    return has_letter(text)
+
+
 def is_instrument_label(cleaned: str) -> bool:
     if cleaned in INSTRUMENT_TERMS:
         return True
@@ -252,7 +265,7 @@ def is_likely_lyric_word(raw: str, cleaned: str) -> bool:
     if cleaned in SHORT_LYRIC_WORDS:
         return True
 
-    if not LYRIC_WORD_RE.fullmatch(raw):
+    if not is_unicode_alpha_token(raw, allow_internal_hyphen=True):
         return False
 
     return len(cleaned) >= 5
@@ -262,7 +275,7 @@ def is_likely_lyric_fragment(raw: str, cleaned: str) -> bool:
     if cleaned in SHORT_LYRIC_WORDS:
         return False
 
-    if not LYRIC_FRAGMENT_RE.fullmatch(raw):
+    if not is_unicode_alpha_token(raw):
         return False
 
     return 2 <= len(cleaned) <= 4
