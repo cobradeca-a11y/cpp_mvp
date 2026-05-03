@@ -61,7 +61,7 @@ def test_audit25_preserves_unassigned_layout_and_counts_classifications():
 
     fusion = build_initial_fusion(protocol)
 
-    assert fusion["version"] == "audit-26.1"
+    assert fusion["version"] == "audit-27"
     assert fusion["status"] == "evidence_indexed_needs_layout_mapping"
     assert fusion["classification_counts"] == {
         "instrument_label": 1,
@@ -115,3 +115,49 @@ def test_audit26_1_groups_ocr_blocks_by_visual_line_without_measure_assignment()
         "status": "unassigned_no_musicxml_layout",
     }
     assert fusion["text_line_groups"][1]["text"] == "Liebe"
+
+
+def test_audit27_groups_visual_lines_into_functional_regions_without_assignment():
+    protocol = {
+        "source": {"omr_status": "success"},
+        "ocr": {
+            "status": "success",
+            "text_blocks": [
+                {"text": "Ob", "bbox": {"vertices": [{"x": 5, "y": 20}, {"x": 22, "y": 20}, {"x": 22, "y": 32}, {"x": 5, "y": 32}]}, "page": 1},
+                {"text": "Viol", "bbox": {"vertices": [{"x": 5, "y": 45}, {"x": 30, "y": 45}, {"x": 30, "y": 57}, {"x": 5, "y": 57}]}, "page": 1},
+                {"text": "D", "bbox": {"vertices": [{"x": 50, "y": 90}, {"x": 60, "y": 90}, {"x": 60, "y": 102}, {"x": 50, "y": 102}]}, "page": 1},
+                {"text": "Was", "bbox": {"vertices": [{"x": 50, "y": 130}, {"x": 82, "y": 130}, {"x": 82, "y": 142}, {"x": 50, "y": 142}]}, "page": 1},
+                {"text": "ist", "bbox": {"vertices": [{"x": 88, "y": 131}, {"x": 108, "y": 131}, {"x": 108, "y": 143}, {"x": 88, "y": 143}]}, "page": 1},
+                {"text": "tr", "bbox": {"vertices": [{"x": 140, "y": 170}, {"x": 154, "y": 170}, {"x": 154, "y": 182}, {"x": 140, "y": 182}]}, "page": 1},
+                {"text": ".", "bbox": {"vertices": [{"x": 170, "y": 210}, {"x": 172, "y": 210}, {"x": 172, "y": 212}, {"x": 170, "y": 212}]}, "page": 1},
+            ],
+        },
+        "systems": [],
+        "measures": [{"id": "m1"}],
+    }
+
+    fusion = build_initial_fusion(protocol)
+
+    assert fusion["region_counts"] == {
+        "chord_region": 1,
+        "editorial_region": 1,
+        "instrument_region": 2,
+        "lyric_region": 1,
+        "noise_region": 1,
+    }
+    assert [region["region_type"] for region in fusion["text_region_groups"]] == [
+        "instrument_region",
+        "instrument_region",
+        "chord_region",
+        "lyric_region",
+        "editorial_region",
+        "noise_region",
+    ]
+    assert all(
+        region["assignment"] == {
+            "system_id": None,
+            "measure_id": None,
+            "status": "unassigned_no_musicxml_layout",
+        }
+        for region in fusion["text_region_groups"]
+    )
