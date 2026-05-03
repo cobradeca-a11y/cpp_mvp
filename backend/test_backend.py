@@ -82,8 +82,11 @@ def test_pdf_returns_professional_protocol_when_audiveris_unavailable(monkeypatc
     assert data["source"]["file_type"] == "pdf"
     assert data["source"]["omr_status"] == "unavailable"
     assert data["source"]["omr_engine"] == "Audiveris"
-    assert data["source"]["ocr_status"] == "pending"
+    assert data["source"]["ocr_status"] == "unavailable"
+    assert "ocr" in data
+    assert data["ocr"]["status"] == "unavailable"
     assert data["source"]["validation_status"] == "pending"
+    assert data["measures"] == []
     assert "validation" in data
     assert data["validation"]["validation_status"] == "pending"
     assert "outputs" in data
@@ -107,6 +110,7 @@ def test_musicxml_without_namespace_imports_measures():
     data = response.json()
     assert data["source"]["file_type"] == "musicxml"
     assert data["source"]["omr_status"] == "musicxml_parsed"
+    assert data["ocr"]["status"] == "not_applicable"
     assert data["music"]["title"] == "Teste sem namespace"
     assert data["music"]["meter_default"] == "3/4"
     assert len(data["measures"]) == 1
@@ -125,5 +129,56 @@ def test_mxl_package_imports_measures():
     data = response.json()
     assert data["source"]["file_type"] == "mxl"
     assert data["source"]["omr_status"] == "musicxml_parsed"
+    assert data["ocr"]["status"] == "not_applicable"
     assert len(data["measures"]) == 1
     assert data["systems"][0]["detected_summary"]["measure_count"] == 1
+
+
+def test_image_returns_unavailable_when_google_vision_not_configured(monkeypatch):
+    monkeypatch.setattr(main, "audiveris_available", lambda: False)
+    monkeypatch.setattr(main, "OCR_ENGINE", "google_vision")
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/omr/analyze",
+        files={"file": ("sample.png", b"\x89PNG\r\n\x1a\nfake", "image/png")},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["source"]["file_type"] == "png"
+    assert data["ocr"]["status"] == "unavailable"
+    assert "GOOGLE_APPLICATION_CREDENTIALS" in data["ocr"]["warnings"][0]
+    assert data["measures"] == []
+
+
+def test_image_google_vision_success_with_mock(monkeypatch, tmp_path):
+    monkeypatch.setattr(main, "OCR_ENGINE", "google_vision")
+    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", str(tmp_path / "gcp.json"))
+    (tmp_path / "gcp.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(
+        "ocr_engine._run_google_vision_image",
+        lambda *_args, **_kwargs: [
+            {
+                "text": "Am",
+                "confidence": 0.0,
+                "bbox": {"vertices": [{"x": 1, "y": 2}, {"x": 3, "y": 2}, {"x": 3, "y": 4}, {"x": 1, "y": 4}]},
+                "page": 1,
+                "source": "ocr",
+            }
+        ],
+    )
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/omr/analyze",
+        files={"file": ("sample.png", b"\x89PNG\r\n\x1a\nfake", "image/png")},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["ocr"]["status"] == "success"
+    assert data["ocr"]["engine"] == "google_vision"
+    assert data["ocr"]["text_blocks"][0]["text"] == "Am"
+    assert data["source"]["ocr_status"] == "success"
+    assert data["measures"] == []

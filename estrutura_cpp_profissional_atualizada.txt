@@ -1002,3 +1002,33 @@ Próximo passo:
 
 Iniciar novo bloco técnico:
 Auditoria 21 — planejamento e implementação inicial do OCR/fusão MusicXML + OCR.
+
+============================================================
+AUDITORIA 21 — CONTRATO REAL DE OCR (SEM FUSÃO)
+STATUS: IMPLEMENTADA / PENDENTE DE VALIDAÇÃO LOCAL
+============================================================
+
+Resumo desta auditoria:
+- criado backend/ocr_engine.py com contrato auditável de OCR;
+- status possíveis no bloco OCR: pending, unavailable, success, failed e not_applicable;
+- integração do bloco OCR no protocolo de saída do backend (campo de alto nível `ocr`);
+- sincronização explícita de source.ocr_status e source.ocr_engine com o bloco OCR;
+- entrada MusicXML/MXL marcada como not_applicable (sem tentativa de OCR);
+- entrada PDF/imagem sem OCR configurado marcada como unavailable (sem OCR fake);
+- nenhuma fusão OCR+MusicXML aplicada nesta auditoria;
+- nenhuma alteração estrutural de compassos/notas/pausas/tom/fórmula feita por OCR.
+
+============================================================
+AUDITORIA 22 — GOOGLE VISION OCR REAL (SEM FUSÃO)
+STATUS: IMPLEMENTADA / PENDENTE DE VALIDAÇÃO LOCAL
+============================================================
+
+Resumo desta auditoria:
+- backend/requirements.txt atualizado com google-cloud-vision;
+- backend/ocr_engine.py atualizado para executar OCR real com Google Vision quando OCR_ENGINE=google_vision;
+- OCR_FEATURE suportado (padrão DOCUMENT_TEXT_DETECTION);
+- GOOGLE_APPLICATION_CREDENTIALS suportado via variável de ambiente padrão do Google;
+- imagens png/jpg/jpeg/webp executam OCR real (quando credenciais e dependência estão disponíveis);
+- PDF local retorna unavailable com aviso explícito sobre necessidade de fluxo GCS ou conversão página→imagem;
+- sem fusão MusicXML+OCR nesta auditoria;
+- sem alteração estrutural de measures/systems/key/meter/notes/rests/review por OCR.
