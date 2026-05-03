@@ -30,10 +30,12 @@ def create_empty_ocr_contract(status: str = "pending", engine: str = "") -> dict
 def build_ocr_contract(source_path: str | Path | None = None, source_name: str = "", file_type: str = "") -> dict[str, Any]:
     """Return an explicit OCR evidence contract without faking OCR results.
 
-    Audit 22 adds real Google Vision OCR for image inputs only. It must not:
-    - merge OCR with MusicXML;
-    - mutate measures, meter, key, notes, rests or review state;
-    - invent chords, lyrics or text blocks when OCR is unavailable.
+    Audit 22.1 supports Google Vision through either:
+    - GOOGLE_APPLICATION_CREDENTIALS JSON when available; or
+    - Application Default Credentials from `gcloud auth application-default login`.
+
+    It must not merge OCR with MusicXML or mutate measures, meter, key,
+    notes, rests, navigation or review state.
     """
     normalized_type = normalize_file_type(file_type or suffix_to_file_type(source_name))
 
@@ -75,12 +77,8 @@ def build_ocr_contract(source_path: str | Path | None = None, source_name: str =
 
 def run_google_vision_image_ocr(source_path: Path | None) -> dict[str, Any]:
     credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "").strip().strip('"')
-    if not credentials_path:
-        contract = create_empty_ocr_contract(status="unavailable", engine=GOOGLE_VISION_ENGINE)
-        contract["warnings"].append("GOOGLE_APPLICATION_CREDENTIALS não definido para Google Vision OCR.")
-        return contract
 
-    if not Path(credentials_path).exists():
+    if credentials_path and not Path(credentials_path).exists():
         contract = create_empty_ocr_contract(status="unavailable", engine=GOOGLE_VISION_ENGINE)
         contract["warnings"].append(f"Arquivo de credenciais Google não encontrado: {credentials_path}")
         return contract
@@ -98,13 +96,19 @@ def run_google_vision_image_ocr(source_path: Path | None) -> dict[str, Any]:
         return contract
     except Exception as exc:  # pragma: no cover - external API/runtime path
         contract = create_empty_ocr_contract(status="failed", engine=GOOGLE_VISION_ENGINE)
-        contract["warnings"].append(f"Falha ao executar Google Vision OCR: {exc}")
+        contract["warnings"].append(
+            "Falha ao executar Google Vision OCR. Verifique GOOGLE_APPLICATION_CREDENTIALS ou rode "
+            "`gcloud auth application-default login` para usar ADC local. Detalhe: "
+            f"{exc}"
+        )
         return contract
 
     contract = create_empty_ocr_contract(status="success", engine=GOOGLE_VISION_ENGINE)
     contract["text_blocks"] = text_blocks
     if not text_blocks:
         contract["warnings"].append("Google Vision executou, mas não retornou blocos de texto.")
+    if not credentials_path:
+        contract["warnings"].append("Google Vision executado via Application Default Credentials local.")
     return contract
 
 
