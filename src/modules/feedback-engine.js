@@ -25,6 +25,34 @@ function pendingReason(measure) {
   return "";
 }
 
+function classificationCountsLines(fusion) {
+  const counts = fusion.classification_counts || {};
+  const entries = Object.entries(counts).filter(([, value]) => Number(value) > 0);
+
+  if (!entries.length) {
+    return ["- Classificações OCR/Fusion: nenhuma categoria registrada."];
+  }
+
+  const labels = {
+    instrument_label: "instrumentos",
+    possible_lyric: "texto/letra provável",
+    lyric_syllable_fragment: "fragmentos de sílaba",
+    lyric_hyphen_or_continuation: "hífens/continuações",
+    punctuation: "pontuação",
+    music_symbol_noise: "ruído/símbolo musical",
+    possible_chord: "cifras candidatas",
+    editorial_text: "texto editorial",
+    possible_navigation: "navegação candidata",
+    unknown: "desconhecido",
+  };
+
+  const lines = ["- Classificações OCR/Fusion:"];
+  entries.forEach(([key, value]) => {
+    lines.push(`  - ${labels[key] || key}: ${value}`);
+  });
+  return lines;
+}
+
 function fusionSummary(protocol) {
   const fusion = protocol.fusion || {};
   const ocr = protocol.ocr || {};
@@ -38,10 +66,12 @@ function fusionSummary(protocol) {
   if (fusion.engine) {
     lines.push(`- Status Fusion: ${fusion.status || "pending"}`);
     lines.push(`- Motor Fusion: ${fusion.engine}`);
+    lines.push(`- Versão Fusion: ${fusion.version || "não informada"}`);
     lines.push(`- Blocos indexados: ${fusion.text_blocks_index?.length || 0}`);
     lines.push(`- Cifras candidatas: ${fusion.possible_chords?.length || 0}`);
     lines.push(`- Textos/letras candidatos: ${fusion.possible_lyrics?.length || 0}`);
     lines.push(`- Navegação candidata: ${fusion.possible_navigation?.length || 0}`);
+    lines.push(...classificationCountsLines(fusion));
   } else {
     lines.push("- Fusion: ainda não disponível no protocolo.");
   }
@@ -166,6 +196,7 @@ export function detectionReport(protocol) {
   lines.push(`Motor OCR: ${protocol.source?.ocr_engine || protocol.ocr?.engine || "não configurado"}`);
   lines.push(`Status OCR: ${protocol.source?.ocr_status || protocol.ocr?.status || "pending"}`);
   lines.push(`Status Fusion: ${protocol.fusion?.status || "not_available"}`);
+  lines.push(`Versão Fusion: ${protocol.fusion?.version || "não informada"}`);
   lines.push(`Validação: ${protocol.source?.validation_status || protocol.validation?.validation_status || "pending"}`);
   lines.push("");
 
