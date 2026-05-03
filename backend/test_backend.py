@@ -107,6 +107,13 @@ def assert_ocr_system_association_contract(data):
     assert isinstance(contract["unassigned_count"], int)
 
 
+def assert_professional_contracts(data, expected_ocr_status):
+    assert_ocr_contract(data, expected_ocr_status)
+    assert_fusion_contract(data)
+    assert_layout_contract(data)
+    assert_ocr_system_association_contract(data)
+
+
 def test_health_endpoint():
     client = TestClient(app)
     response = client.get("/health")
@@ -135,10 +142,7 @@ def test_pdf_returns_professional_protocol_when_audiveris_unavailable(monkeypatc
     assert data["source"]["omr_status"] == "unavailable"
     assert data["source"]["omr_engine"] == "Audiveris"
     assert data["source"]["validation_status"] == "pending"
-    assert_ocr_contract(data, "unavailable")
-    assert_fusion_contract(data)
-    assert_layout_contract(data)
-    assert_ocr_system_association_contract(data)
+    assert_professional_contracts(data, "unavailable")
     assert data["ocr"]["text_blocks"] == []
     assert data["ocr"]["possible_chords"] == []
     assert data["ocr"]["possible_lyrics"] == []
@@ -169,10 +173,7 @@ def test_musicxml_without_namespace_imports_measures():
     data = response.json()
     assert data["source"]["file_type"] == "musicxml"
     assert data["source"]["omr_status"] == "musicxml_parsed"
-    assert_ocr_contract(data, "not_applicable")
-    assert_fusion_contract(data)
-    assert_layout_contract(data)
-    assert_ocr_system_association_contract(data)
+    assert_professional_contracts(data, "not_applicable")
     assert data["fusion"]["status"] == "no_ocr_text"
     assert data["layout"]["status"] == "geometry_unavailable"
     assert data["layout"]["page_count"] == 1
@@ -199,10 +200,7 @@ def test_mxl_package_imports_measures():
     data = response.json()
     assert data["source"]["file_type"] == "mxl"
     assert data["source"]["omr_status"] == "musicxml_parsed"
-    assert_ocr_contract(data, "not_applicable")
-    assert_fusion_contract(data)
-    assert_layout_contract(data)
-    assert_ocr_system_association_contract(data)
+    assert_professional_contracts(data, "not_applicable")
     assert len(data["measures"]) == 1
     assert data["systems"][0]["detected_summary"]["measure_count"] == 1
 
@@ -226,10 +224,7 @@ def test_image_google_vision_adc_failure_is_reported(monkeypatch):
     assert response.status_code == 200
     data = response.json()
     assert data["source"]["file_type"] == "png"
-    assert_ocr_contract(data, "failed")
-    assert_fusion_contract(data)
-    assert_layout_contract(data)
-    assert_ocr_system_association_contract(data)
+    assert_professional_contracts(data, "failed")
     assert data["ocr"]["engine"] == "google_vision"
     assert "gcloud auth application-default login" in data["ocr"]["warnings"][0]
     assert data["measures"] == []
@@ -251,10 +246,7 @@ def test_pdf_google_vision_without_page_conversion_remains_unavailable(monkeypat
     assert response.status_code == 200
     data = response.json()
     assert data["source"]["file_type"] == "pdf"
-    assert_ocr_contract(data, "unavailable")
-    assert_fusion_contract(data)
-    assert_layout_contract(data)
-    assert_ocr_system_association_contract(data)
+    assert_professional_contracts(data, "unavailable")
     assert data["ocr"]["engine"] == "google_vision"
     assert "PDF local exige conversão" in data["ocr"]["warnings"][0]
     assert data["measures"] == []
@@ -296,10 +288,7 @@ def test_image_google_vision_success_with_mocked_json_credentials(monkeypatch, t
     assert response.status_code == 200
     data = response.json()
     assert data["source"]["file_type"] == "png"
-    assert_ocr_contract(data, "success")
-    assert_fusion_contract(data)
-    assert_layout_contract(data)
-    assert_ocr_system_association_contract(data)
+    assert_professional_contracts(data, "success")
     assert data["ocr"]["engine"] == "google_vision"
     assert data["ocr"]["text_blocks"][0]["text"] == "Am"
     assert data["source"]["ocr_status"] == "success"
@@ -309,9 +298,15 @@ def test_image_google_vision_success_with_mocked_json_credentials(monkeypatch, t
     assert data["fusion"]["possible_lyrics"][0]["text"] == "Glória"
     assert data["fusion"]["text_blocks_index"][0]["assignment"]["measure_id"] is None
     assert data["ocr_system_associations"]["status"] == "blocked_no_reliable_layout_geometry"
-    assert data["ocr_system_associations"]["blocked_count"] == 1
-    assert data["ocr_system_associations"]["associations"][0]["association_status"] == "blocked_no_reliable_layout_geometry"
-    assert data["ocr_system_associations"]["associations"][0]["candidate_system_id"] is None
+    assert data["ocr_system_associations"]["blocked_count"] == 2
+    assert all(
+        association["association_status"] == "blocked_no_reliable_layout_geometry"
+        for association in data["ocr_system_associations"]["associations"]
+    )
+    assert all(
+        association["candidate_system_id"] is None
+        for association in data["ocr_system_associations"]["associations"]
+    )
 
 
 def test_image_google_vision_success_with_mocked_adc(monkeypatch):
@@ -340,10 +335,7 @@ def test_image_google_vision_success_with_mocked_adc(monkeypatch):
     assert response.status_code == 200
     data = response.json()
     assert data["source"]["file_type"] == "jpg"
-    assert_ocr_contract(data, "success")
-    assert_fusion_contract(data)
-    assert_layout_contract(data)
-    assert_ocr_system_association_contract(data)
+    assert_professional_contracts(data, "success")
     assert data["ocr"]["engine"] == "google_vision"
     assert data["ocr"]["text_blocks"][0]["text"] == "Glória"
     assert "Application Default Credentials" in data["ocr"]["warnings"][0]
