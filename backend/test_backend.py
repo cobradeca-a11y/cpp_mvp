@@ -107,11 +107,25 @@ def assert_ocr_system_association_contract(data):
     assert isinstance(contract["unassigned_count"], int)
 
 
+def assert_ocr_measure_association_contract(data):
+    assert "ocr_measure_associations" in data
+    contract = data["ocr_measure_associations"]
+    assert contract["engine"] == "cpp_ocr_measure_association_contract"
+    assert contract["version"] == "audit-32"
+    assert isinstance(contract["associations"], list)
+    assert isinstance(contract["warnings"], list)
+    assert isinstance(contract["association_count"], int)
+    assert isinstance(contract["assigned_count"], int)
+    assert isinstance(contract["blocked_count"], int)
+    assert isinstance(contract["unassigned_count"], int)
+
+
 def assert_professional_contracts(data, expected_ocr_status):
     assert_ocr_contract(data, expected_ocr_status)
     assert_fusion_contract(data)
     assert_layout_contract(data)
     assert_ocr_system_association_contract(data)
+    assert_ocr_measure_association_contract(data)
 
 
 def test_health_endpoint():
@@ -149,6 +163,7 @@ def test_pdf_returns_professional_protocol_when_audiveris_unavailable(monkeypatc
     assert data["fusion"]["status"] == "no_ocr_text"
     assert data["layout"]["status"] == "no_layout_subjects"
     assert data["ocr_system_associations"]["status"] == "no_ocr_regions"
+    assert data["ocr_measure_associations"]["status"] == "no_ocr_regions"
     assert data["measures"] == []
     assert "validation" in data
     assert data["validation"]["validation_status"] == "pending"
@@ -181,6 +196,7 @@ def test_musicxml_without_namespace_imports_measures():
     assert data["layout"]["pages"][0]["geometry_status"] == "unavailable_no_reliable_layout_geometry"
     assert data["layout"]["systems"][0]["geometry_status"] == "unavailable_no_reliable_layout_geometry"
     assert data["ocr_system_associations"]["status"] == "no_ocr_regions"
+    assert data["ocr_measure_associations"]["status"] == "no_ocr_regions"
     assert data["systems"][0]["geometry"]["bbox"] is None
     assert data["music"]["title"] == "Teste sem namespace"
     assert data["music"]["meter_default"] == "3/4"
@@ -306,6 +322,16 @@ def test_image_google_vision_success_with_mocked_json_credentials(monkeypatch, t
     assert all(
         association["candidate_system_id"] is None
         for association in data["ocr_system_associations"]["associations"]
+    )
+    assert data["ocr_measure_associations"]["status"] == "blocked_no_system_association"
+    assert data["ocr_measure_associations"]["blocked_count"] == 2
+    assert all(
+        association["association_status"] == "blocked_no_system_association"
+        for association in data["ocr_measure_associations"]["associations"]
+    )
+    assert all(
+        association["candidate_measure_id"] is None
+        for association in data["ocr_measure_associations"]["associations"]
     )
 
 
