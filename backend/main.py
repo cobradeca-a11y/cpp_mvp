@@ -12,6 +12,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from association_engine import sync_ocr_system_associations
 from fusion_engine import sync_initial_fusion
 from geometry_engine import sync_layout_geometry
 from musicxml_parser import parse_musicxml_to_cpp
@@ -151,6 +152,12 @@ def sanitize_filename(name: str) -> str:
     return safe or "upload.pdf"
 
 
+def finalize_protocol(protocol: dict[str, Any]) -> dict[str, Any]:
+    protocol = sync_layout_geometry(protocol)
+    protocol = sync_initial_fusion(protocol)
+    return sync_ocr_system_associations(protocol)
+
+
 def make_base_protocol(
     filename: str,
     file_type: str = "",
@@ -193,8 +200,7 @@ def make_base_protocol(
         },
     }
     protocol = sync_ocr_contract(protocol, ocr_contract or build_ocr_contract(source_name=filename, file_type=protocol["source"]["file_type"]))
-    protocol = sync_layout_geometry(protocol)
-    return sync_initial_fusion(protocol)
+    return finalize_protocol(protocol)
 
 
 def normalize_professional_protocol(
@@ -221,5 +227,4 @@ def normalize_professional_protocol(
     merged.setdefault("measures", [])
     merged.setdefault("review", [])
     merged = sync_ocr_contract(merged, ocr_contract or merged.get("ocr") or base.get("ocr"))
-    merged = sync_layout_geometry(merged)
-    return sync_initial_fusion(merged)
+    return finalize_protocol(merged)
