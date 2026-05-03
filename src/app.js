@@ -8,7 +8,7 @@ import { generatePlayableChordSheet } from "./modules/chord-sheet-playable.js";
 import { globalUncertaintyReport } from "./modules/confidence-engine.js";
 import { downloadText, versioned } from "./modules/export-output.js";
 
-const FRONTEND_BUILD = "audit-26-cache-v1";
+const FRONTEND_BUILD = "audit-28-cache-v1";
 
 let protocol = loadProtocol();
 let selectedFile = null;
@@ -310,7 +310,7 @@ function initEvents() {
     downloadText(versioned("relatorio_deteccao", "txt"), protocol.outputs.detection_report);
   };
 
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js?v=audit-26-cache-v1").catch(() => {});
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js?v=audit-28-cache-v1").catch(() => {});
   refreshReview();
   generateOutputs();
 }
