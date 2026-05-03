@@ -5,15 +5,15 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
   <meta name="theme-color" content="#111827" />
   <title>cpp_pro — Conversor Profissional de Partituras</title>
-  <link rel="manifest" href="./manifest.json?v=audit-28-cache-v1" />
-  <link rel="stylesheet" href="./src/styles.css?v=audit-28-cache-v1" />
+  <link rel="manifest" href="./manifest.json?v=audit-35-cache-v1" />
+  <link rel="stylesheet" href="./src/styles.css?v=audit-35-cache-v1" />
 </head>
 <body>
   <header class="app-header">
     <div>
       <h1>cpp_pro</h1>
       <p>Conversor Profissional de Partituras — OMR, MusicXML, Revisão e Cifra Tocável</p>
-      <p id="frontendBuild" class="build-info">Frontend build: audit-28-cache-v1</p>
+      <p id="frontendBuild" class="build-info">Frontend build: audit-35-cache-v1</p>
     </div>
   </header>
 
@@ -52,7 +52,7 @@
     </section>
 
     <section class="panel active">
-      <h2>2. Revisão</h2>
+      <h2>2. Revisão de compassos</h2>
       <p class="hint">A revisão parte do JSON gerado pelo OMR/MusicXML. Correções manuais servem apenas para ajustar o resultado estrutural.</p>
 
       <div class="toolbar sticky">
@@ -70,6 +70,27 @@
         <aside class="side">
           <h3>Compassos importados</h3>
           <div id="measuresList" class="list"></div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="panel active">
+      <h2>2A. Revisão OCR por bloco</h2>
+      <p class="hint">Auditoria 35: inspeção humana dos blocos OCR. Esta tela não aprova, rejeita nem altera evidência automaticamente.</p>
+
+      <div class="toolbar sticky">
+        <button id="btnPrevOcrBlock">Bloco OCR anterior</button>
+        <button id="btnNextOcrBlock">Próximo bloco OCR</button>
+      </div>
+
+      <div class="layout">
+        <div class="card">
+          <h3>Bloco OCR atual</h3>
+          <div id="ocrBlockDetails" class="ocr-details">Nenhum bloco OCR carregado.</div>
+        </div>
+        <aside class="side">
+          <h3>Blocos OCR</h3>
+          <div id="ocrBlocksList" class="list"></div>
         </aside>
       </div>
     </section>
@@ -96,6 +117,6 @@
   </main>
 
   <div id="toast" class="toast hidden"></div>
-  <script type="module" src="./src/app.js?v=audit-28-cache-v1"></script>
+  <script type="module" src="./src/app.js?v=audit-35-cache-v1"></script>
 </body>
 </html>
