@@ -61,7 +61,7 @@ def test_audit25_preserves_unassigned_layout_and_counts_classifications():
 
     fusion = build_initial_fusion(protocol)
 
-    assert fusion["version"] == "audit-28"
+    assert fusion["version"] == "audit-29"
     assert fusion["status"] == "evidence_indexed_needs_layout_mapping"
     assert fusion["classification_counts"] == {
         "instrument_label": 1,
@@ -195,3 +195,48 @@ def test_audit28_normalizes_ocr_text_without_replacing_raw_evidence():
     assert fusion["possible_chords"][0]["normalized_text"] == "A7/G"
     assert fusion["text_line_groups"][0]["normalized_text"] == "Kuß -"
     assert fusion["text_region_groups"][0]["normalized_text"] == "Kuß -"
+
+
+def test_audit29_analyzes_chord_candidates_without_harmonic_inference():
+    protocol = {
+        "source": {"omr_status": "success"},
+        "ocr": {
+            "status": "success",
+            "text_blocks": [
+                {"text": "D", "bbox": {"vertices": [{"x": 10, "y": 10}, {"x": 20, "y": 10}, {"x": 20, "y": 22}, {"x": 10, "y": 22}]}, "page": 1},
+                {"text": "A7 / G", "bbox": {"vertices": [{"x": 30, "y": 10}, {"x": 70, "y": 10}, {"x": 70, "y": 22}, {"x": 30, "y": 22}]}, "page": 1},
+                {"text": "Em7(add11)", "bbox": {"vertices": [{"x": 80, "y": 10}, {"x": 140, "y": 10}, {"x": 140, "y": 22}, {"x": 80, "y": 22}]}, "page": 1},
+            ],
+        },
+        "systems": [],
+        "measures": [{"id": "m1"}],
+    }
+
+    fusion = build_initial_fusion(protocol)
+
+    assert fusion["chord_candidate_counts"] == {
+        "altered_or_added_tone_chord_candidate": 1,
+        "root_only_chord_candidate": 1,
+        "slash_bass_chord_candidate": 1,
+    }
+    assert [candidate["normalized_text"] for candidate in fusion["possible_chords"]] == ["D", "A7/G", "Em7(add11)"]
+    assert fusion["possible_chords"][0]["chord_analysis"] == {
+        "pattern_status": "root_only_chord_candidate",
+        "normalized_chord": "D",
+        "root": "D",
+        "accidental": None,
+        "quality": None,
+        "extension": None,
+        "alterations": None,
+        "bass": None,
+        "has_slash_bass": False,
+        "confidence": "conservative",
+        "notes": ["ocr_chord_candidate_only_no_harmonic_inference"],
+    }
+    assert fusion["possible_chords"][1]["chord_analysis"]["pattern_status"] == "slash_bass_chord_candidate"
+    assert fusion["possible_chords"][1]["chord_analysis"]["bass"] == "G"
+    assert fusion["possible_chords"][2]["chord_analysis"]["root"] == "E"
+    assert fusion["possible_chords"][2]["chord_analysis"]["quality"] == "m"
+    assert fusion["possible_chords"][2]["chord_analysis"]["extension"] == "7"
+    assert fusion["possible_chords"][2]["chord_analysis"]["alterations"] == "(add11)"
+    assert all(candidate["assignment_status"] == "unassigned_no_musicxml_layout" for candidate in fusion["possible_chords"])
