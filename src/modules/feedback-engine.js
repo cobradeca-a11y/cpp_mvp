@@ -25,11 +25,40 @@ function pendingReason(measure) {
   return "";
 }
 
+function fusionSummary(protocol) {
+  const fusion = protocol.fusion || {};
+  const ocr = protocol.ocr || {};
+  const lines = [];
+
+  lines.push("Evidências OCR/Fusion:");
+  lines.push(`- Status OCR: ${ocr.status || protocol.source?.ocr_status || "pending"}`);
+  lines.push(`- Motor OCR: ${ocr.engine || protocol.source?.ocr_engine || "não configurado"}`);
+  lines.push(`- Blocos OCR: ${ocr.text_blocks?.length || 0}`);
+
+  if (fusion.engine) {
+    lines.push(`- Status Fusion: ${fusion.status || "pending"}`);
+    lines.push(`- Motor Fusion: ${fusion.engine}`);
+    lines.push(`- Blocos indexados: ${fusion.text_blocks_index?.length || 0}`);
+    lines.push(`- Cifras candidatas: ${fusion.possible_chords?.length || 0}`);
+    lines.push(`- Textos/letras candidatos: ${fusion.possible_lyrics?.length || 0}`);
+    lines.push(`- Navegação candidata: ${fusion.possible_navigation?.length || 0}`);
+  } else {
+    lines.push("- Fusion: ainda não disponível no protocolo.");
+  }
+
+  if (fusion.warnings?.length) fusion.warnings.forEach(w => lines.push(`- Aviso Fusion: ${w}`));
+  if (ocr.warnings?.length) ocr.warnings.forEach(w => lines.push(`- Aviso OCR: ${w}`));
+
+  return lines;
+}
+
 export function systemFeedback(protocol, systemId) {
   const system = protocol.systems.find(s => s.system_id === systemId);
   if (!system) return "Nenhum sistema selecionado/importado.";
 
   const s = system.detected_summary || {};
+  const fusion = protocol.fusion || {};
+  const hasFusion = Boolean(fusion.engine);
   const lines = [
     `Sistema ${system.number || system.system_id} importado.`,
     `Status: ${system.status || "musicxml_imported"}`,
@@ -47,8 +76,15 @@ export function systemFeedback(protocol, systemId) {
   if (s.navigation?.length) lines.push(`- Navegação registrada: ${[...new Set(s.navigation)].join(", ")}`);
 
   if (!s.chords?.length && !s.lyrics?.length && !s.navigation?.length) {
-    lines.push("- Nenhum texto/cifra complementar registrado ainda. OCR/fusão ainda não executados.");
+    if (hasFusion) {
+      lines.push("- Nenhum texto/cifra foi atribuído a compassos ainda. OCR/Fusion já indexou evidências, mas o alinhamento por compasso permanece pendente.");
+    } else {
+      lines.push("- Nenhum texto/cifra complementar registrado ainda. OCR/fusão ainda não executados.");
+    }
   }
+
+  lines.push("");
+  lines.push(...fusionSummary(protocol));
 
   lines.push("");
   const measures = protocol.measures.filter(m => m.system_id === systemId).sort((a, b) => a.number - b.number);
@@ -73,6 +109,9 @@ export function systemFeedback(protocol, systemId) {
   if (!pend.length) lines.push("- Nenhuma pendência crítica registrada.");
   for (const item of pend) {
     lines.push(`- Compasso ${item.measure.number}: ${item.reason}`);
+  }
+  if (hasFusion && fusion.status === "evidence_indexed_needs_layout_mapping") {
+    lines.push("- Fusion: relacionar blocos OCR a sistema/compasso ainda exige geometria MusicXML/layout confiável.");
   }
   if (s.warnings?.length) s.warnings.forEach(w => lines.push(`- ${w}`));
 
@@ -124,8 +163,9 @@ export function detectionReport(protocol) {
   const lines = ["RELATÓRIO DE DETECÇÃO E IMPORTAÇÃO", ""];
   lines.push(`Motor OMR: ${protocol.source?.omr_engine || "Audiveris"}`);
   lines.push(`Status OMR: ${protocol.source?.omr_status || "pending"}`);
-  lines.push(`Motor OCR: ${protocol.source?.ocr_engine || "não configurado"}`);
-  lines.push(`Status OCR: ${protocol.source?.ocr_status || "pending"}`);
+  lines.push(`Motor OCR: ${protocol.source?.ocr_engine || protocol.ocr?.engine || "não configurado"}`);
+  lines.push(`Status OCR: ${protocol.source?.ocr_status || protocol.ocr?.status || "pending"}`);
+  lines.push(`Status Fusion: ${protocol.fusion?.status || "not_available"}`);
   lines.push(`Validação: ${protocol.source?.validation_status || protocol.validation?.validation_status || "pending"}`);
   lines.push("");
 
@@ -133,6 +173,10 @@ export function detectionReport(protocol) {
     lines.push(systemFeedback(protocol, s.system_id), "");
   }
 
-  if (!protocol.systems?.length) lines.push("Nenhum sistema importado ainda.");
+  if (!protocol.systems?.length) {
+    lines.push("Nenhum sistema importado ainda.");
+    lines.push("");
+    lines.push(...fusionSummary(protocol));
+  }
   return lines.join("\n");
 }
