@@ -1,21 +1,22 @@
-const CACHE_NAME = "cpp-professional-omr-v3-audit16";
+const APP_BUILD = "audit-24-1-cache-v1";
+const CACHE_NAME = `cpp-professional-omr-${APP_BUILD}`;
 
 const ASSETS = [
   "./",
-  "./index.html",
-  "./manifest.json",
-  "./src/styles.css",
-  "./src/app.js",
-  "./src/modules/cpp-json.js",
-  "./src/modules/file-input.js",
-  "./src/modules/professional-omr-client.js",
-  "./src/modules/feedback-engine.js",
-  "./src/modules/measure-review.js",
-  "./src/modules/chord-sheet-technical.js",
-  "./src/modules/chord-sheet-playable.js",
-  "./src/modules/confidence-engine.js",
-  "./src/modules/navigation-engine.js",
-  "./src/modules/export-output.js"
+  "./index.html?v=audit-24-1-cache-v1",
+  "./manifest.json?v=audit-24-1-cache-v1",
+  "./src/styles.css?v=audit-24-1-cache-v1",
+  "./src/app.js?v=audit-24-1-cache-v1",
+  "./src/modules/cpp-json.js?v=audit-24-1-cache-v1",
+  "./src/modules/file-input.js?v=audit-24-1-cache-v1",
+  "./src/modules/professional-omr-client.js?v=audit-24-1-cache-v1",
+  "./src/modules/feedback-engine.js?v=audit-24-1-cache-v1",
+  "./src/modules/measure-review.js?v=audit-24-1-cache-v1",
+  "./src/modules/chord-sheet-technical.js?v=audit-24-1-cache-v1",
+  "./src/modules/chord-sheet-playable.js?v=audit-24-1-cache-v1",
+  "./src/modules/confidence-engine.js?v=audit-24-1-cache-v1",
+  "./src/modules/navigation-engine.js?v=audit-24-1-cache-v1",
+  "./src/modules/export-output.js?v=audit-24-1-cache-v1"
 ];
 
 self.addEventListener("install", event => {
@@ -39,11 +40,30 @@ async function networkFirst(request) {
     }
     return response;
   } catch (error) {
-    const cached = await cache.match(request);
+    const cached = await cache.match(request, { ignoreSearch: true });
     if (cached) return cached;
     throw error;
   }
 }
+
+async function clearCppCaches() {
+  const keys = await caches.keys();
+  await Promise.all(keys.filter(key => key.startsWith("cpp-professional-omr-")).map(key => caches.delete(key)));
+}
+
+self.addEventListener("message", event => {
+  if (event.data?.type === "CPP_CLEAR_CACHE_AND_RELOAD") {
+    event.waitUntil(
+      clearCppCaches().then(() => self.clients.matchAll({ type: "window" })).then(clients => {
+        clients.forEach(client => client.postMessage({ type: "CPP_CACHE_CLEARED", build: APP_BUILD }));
+      })
+    );
+  }
+
+  if (event.data?.type === "CPP_GET_BUILD") {
+    event.source?.postMessage({ type: "CPP_BUILD", build: APP_BUILD, cache: CACHE_NAME });
+  }
+});
 
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
@@ -65,6 +85,6 @@ self.addEventListener("fetch", event => {
   }
 
   event.respondWith(
-    caches.match(event.request).then(cached => cached || fetch(event.request).catch(() => cached))
+    caches.match(event.request, { ignoreSearch: true }).then(cached => cached || fetch(event.request).catch(() => cached))
   );
 });
