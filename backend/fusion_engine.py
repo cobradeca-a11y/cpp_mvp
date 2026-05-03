@@ -9,6 +9,13 @@ from typing import Any
 CHORD_RE = re.compile(
     r"^[A-G](?:#|b)?(?:m|maj|min|dim|aug|sus|add)?\d*(?:\([^)]*\))?(?:/[A-G](?:#|b)?)?$"
 )
+CHORD_ANALYSIS_RE = re.compile(
+    r"^(?P<root>[A-G])(?P<accidental>#|b)?"
+    r"(?P<quality>maj|min|dim|aug|sus|add|m)?"
+    r"(?P<extension>\d*)"
+    r"(?P<alterations>\([^)]*\))?"
+    r"(?:/(?P<bass_root>[A-G])(?P<bass_accidental>#|b)?)?$"
+)
 INSTRUMENT_TERMS = {
     "ob",
     "viol",
@@ -74,9 +81,9 @@ MUSIC_SYMBOL_NOISE_TOKENS = {"។", "·", "•", "*"}
 def build_initial_fusion(protocol: dict[str, Any]) -> dict[str, Any]:
     """Build a conservative MusicXML + OCR evidence index.
 
-    Audit 28 adds conservative OCR text normalization while preserving the raw
-    OCR text. It still does not align text to systems or measures. Every
-    musical/spatial assignment remains pending for human review.
+    Audit 29 adds structured analysis for possible chord OCR candidates while
+    preserving raw OCR text. It does not infer harmony, complete missing chords,
+    or align text to systems/measures.
     """
     ocr = protocol.get("ocr") or {}
     source = protocol.get("source") or {}
@@ -87,7 +94,7 @@ def build_initial_fusion(protocol: dict[str, Any]) -> dict[str, Any]:
     fusion = {
         "status": "not_applicable",
         "engine": "initial_musicxml_ocr_fusion",
-        "version": "audit-28",
+        "version": "audit-29",
         "inputs": {
             "omr_status": source.get("omr_status", ""),
             "ocr_status": ocr.get("status", source.get("ocr_status", "")),
@@ -101,6 +108,7 @@ def build_initial_fusion(protocol: dict[str, Any]) -> dict[str, Any]:
         "classification_counts": {},
         "region_counts": {},
         "normalization_counts": {},
+        "chord_candidate_counts": {},
         "possible_chords": [],
         "possible_lyrics": [],
         "possible_navigation": [],
@@ -123,6 +131,7 @@ def build_initial_fusion(protocol: dict[str, Any]) -> dict[str, Any]:
 
     classification_counts: Counter[str] = Counter()
     normalization_counts: Counter[str] = Counter()
+    chord_candidate_counts: Counter[str] = Counter()
 
     for idx, block in enumerate(text_blocks, start=1):
         text = str(block.get("text", "")).strip()
@@ -131,8 +140,11 @@ def build_initial_fusion(protocol: dict[str, Any]) -> dict[str, Any]:
 
         classification = classify_ocr_text(text)
         normalized = normalize_ocr_evidence(text, classification)
+        chord_analysis = analyze_chord_candidate(normalized["normalized_text"]) if classification == "possible_chord" else None
         classification_counts[classification] += 1
         normalization_counts[normalized["normalization_status"]] += 1
+        if chord_analysis:
+            chord_candidate_counts[chord_analysis["pattern_status"]] += 1
         fusion_id = f"fx{idx:04d}"
         indexed = {
             "fusion_id": fusion_id,
@@ -146,6 +158,8 @@ def build_initial_fusion(protocol: dict[str, Any]) -> dict[str, Any]:
             "source": "ocr",
             "assignment": pending_assignment(),
         }
+        if chord_analysis:
+            indexed["chord_analysis"] = chord_analysis
         fusion["text_blocks_index"].append(indexed)
 
         candidate = {
@@ -156,6 +170,8 @@ def build_initial_fusion(protocol: dict[str, Any]) -> dict[str, Any]:
             "page": block.get("page", 1),
             "assignment_status": "unassigned_no_musicxml_layout",
         }
+        if chord_analysis:
+            candidate["chord_analysis"] = chord_analysis
         if classification == "possible_chord":
             fusion["possible_chords"].append(candidate)
         elif classification in {"possible_lyric", "lyric_syllable_fragment"}:
@@ -165,6 +181,7 @@ def build_initial_fusion(protocol: dict[str, Any]) -> dict[str, Any]:
 
     fusion["classification_counts"] = dict(sorted(classification_counts.items()))
     fusion["normalization_counts"] = dict(sorted(normalization_counts.items()))
+    fusion["chord_candidate_counts"] = dict(sorted(chord_candidate_counts.items()))
     fusion["text_line_groups"] = group_ocr_blocks_by_visual_line(fusion["text_blocks_index"])
     fusion["text_region_groups"] = group_text_lines_by_functional_region(fusion["text_line_groups"])
     fusion["region_counts"] = count_regions(fusion["text_region_groups"])
@@ -291,6 +308,57 @@ def normalize_ocr_evidence(text: str, classification: str) -> dict[str, Any]:
         "normalized_text": normalized,
         "normalization_status": "preserved_unclassified",
         "normalization_notes": notes,
+    }
+
+
+def analyze_chord_candidate(text: str) -> dict[str, Any]:
+    normalized = compact_token(text)
+    match = CHORD_ANALYSIS_RE.match(normalized)
+    if not match:
+        return {
+            "pattern_status": "unparsed_chord_candidate",
+            "normalized_chord": normalized,
+            "root": None,
+            "accidental": None,
+            "quality": None,
+            "extension": None,
+            "alterations": None,
+            "bass": None,
+            "has_slash_bass": False,
+            "confidence": "low",
+            "notes": ["regex_classified_but_structure_not_parsed"],
+        }
+
+    data = match.groupdict()
+    bass = None
+    if data.get("bass_root"):
+        bass = f"{data['bass_root']}{data.get('bass_accidental') or ''}"
+
+    has_quality = bool(data.get("quality"))
+    has_extension = bool(data.get("extension"))
+    has_alterations = bool(data.get("alterations"))
+    has_slash = bool(bass)
+    if has_slash:
+        pattern_status = "slash_bass_chord_candidate"
+    elif has_alterations:
+        pattern_status = "altered_or_added_tone_chord_candidate"
+    elif has_quality or has_extension:
+        pattern_status = "qualified_chord_candidate"
+    else:
+        pattern_status = "root_only_chord_candidate"
+
+    return {
+        "pattern_status": pattern_status,
+        "normalized_chord": normalized,
+        "root": data.get("root"),
+        "accidental": data.get("accidental"),
+        "quality": data.get("quality"),
+        "extension": data.get("extension") or None,
+        "alterations": data.get("alterations"),
+        "bass": bass,
+        "has_slash_bass": has_slash,
+        "confidence": "conservative",
+        "notes": ["ocr_chord_candidate_only_no_harmonic_inference"],
     }
 
 
