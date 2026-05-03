@@ -29,6 +29,42 @@ function setStatus(message) {
   $("processingStatus").textContent = message;
 }
 
+function buildProcessingSummary(protocol) {
+  const source = protocol.source || {};
+  const ocr = protocol.ocr || {};
+  const fusion = protocol.fusion || {};
+  const measures = protocol.measures?.length || 0;
+  const textBlocks = ocr.text_blocks?.length || 0;
+  const possibleChords = fusion.possible_chords?.length || 0;
+  const possibleLyrics = fusion.possible_lyrics?.length || 0;
+
+  const lines = [
+    "Processamento concluído.",
+    `Motor OMR: ${source.omr_engine || "Audiveris"}`,
+    `Status OMR: ${source.omr_status || "pending"}`,
+    `Compassos importados: ${measures}`,
+    `Motor OCR: ${source.ocr_engine || ocr.engine || "não configurado"}`,
+    `Status OCR: ${source.ocr_status || ocr.status || "pending"}`,
+    `Blocos OCR: ${textBlocks}`,
+    `Fusion: ${fusion.status || "not_available"}`,
+  ];
+
+  if (fusion.engine) lines.push(`Motor Fusion: ${fusion.engine}`);
+  if (possibleChords || possibleLyrics) {
+    lines.push(`Candidatos OCR: ${possibleChords} cifra(s), ${possibleLyrics} texto(s)/sílaba(s).`);
+  }
+  if (fusion.warnings?.length) {
+    lines.push("Avisos Fusion:");
+    fusion.warnings.forEach(w => lines.push(`- ${w}`));
+  }
+  if (ocr.warnings?.length) {
+    lines.push("Avisos OCR:");
+    ocr.warnings.forEach(w => lines.push(`- ${w}`));
+  }
+
+  return lines.join("\n");
+}
+
 function currentMeasure() {
   return protocol.measures?.[currentMeasureIndex] || null;
 }
@@ -127,14 +163,10 @@ async function processWithProfessionalOmr() {
     currentMeasureIndex = 0;
     persist();
 
-    const status = protocol.source?.omr_status || "processado";
-    const engine = protocol.source?.omr_engine || "OMR profissional";
-    const measures = protocol.measures?.length || 0;
-
-    setStatus(`Processamento concluído.\nMotor: ${engine}\nStatus: ${status}\nCompassos importados: ${measures}`);
+    setStatus(buildProcessingSummary(protocol));
     refreshReview();
     generateOutputs();
-    toast("OMR profissional concluído.");
+    toast("Processamento profissional concluído.");
   } catch (err) {
     console.error(err);
     setStatus(`Erro no processamento profissional.\n${err.message}\n\nVerifique se o backend está rodando e se o Audiveris está configurado.`);
