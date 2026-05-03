@@ -122,12 +122,28 @@ def assert_ocr_measure_association_contract(data):
     assert isinstance(contract["average_confidence_score"], float)
 
 
+def assert_alignment_report_contract(data):
+    assert "alignment_report" in data
+    report = data["alignment_report"]
+    assert report["engine"] == "cpp_ocr_musicxml_alignment_report"
+    assert report["version"] == "audit-34"
+    assert isinstance(report["source_summary"], dict)
+    assert isinstance(report["evidence_summary"], dict)
+    assert isinstance(report["layout_summary"], dict)
+    assert isinstance(report["classification_summary"], dict)
+    assert isinstance(report["association_summary"], dict)
+    assert isinstance(report["blockers"], list)
+    assert isinstance(report["warnings"], list)
+    assert isinstance(report["notes"], list)
+
+
 def assert_professional_contracts(data, expected_ocr_status):
     assert_ocr_contract(data, expected_ocr_status)
     assert_fusion_contract(data)
     assert_layout_contract(data)
     assert_ocr_system_association_contract(data)
     assert_ocr_measure_association_contract(data)
+    assert_alignment_report_contract(data)
 
 
 def test_health_endpoint():
@@ -167,6 +183,7 @@ def test_pdf_returns_professional_protocol_when_audiveris_unavailable(monkeypatc
     assert data["ocr_system_associations"]["status"] == "no_ocr_regions"
     assert data["ocr_measure_associations"]["status"] == "no_ocr_regions"
     assert data["ocr_measure_associations"]["average_confidence_score"] == 0.0
+    assert data["alignment_report"]["status"] in {"alignment_blocked_needs_review", "no_ocr_regions"}
     assert data["measures"] == []
     assert "validation" in data
     assert data["validation"]["validation_status"] == "pending"
@@ -200,6 +217,8 @@ def test_musicxml_without_namespace_imports_measures():
     assert data["layout"]["systems"][0]["geometry_status"] == "unavailable_no_reliable_layout_geometry"
     assert data["ocr_system_associations"]["status"] == "no_ocr_regions"
     assert data["ocr_measure_associations"]["status"] == "no_ocr_regions"
+    assert data["alignment_report"]["layout_summary"]["layout_status"] == "geometry_unavailable"
+    assert data["alignment_report"]["evidence_summary"]["measures_count"] == 1
     assert data["systems"][0]["geometry"]["bbox"] is None
     assert data["music"]["title"] == "Teste sem namespace"
     assert data["music"]["meter_default"] == "3/4"
@@ -346,6 +365,11 @@ def test_image_google_vision_success_with_mocked_json_credentials(monkeypatch, t
         association["confidence_level"] == "blocked"
         for association in data["ocr_measure_associations"]["associations"]
     )
+    assert data["alignment_report"]["status"] == "alignment_blocked_needs_review"
+    assert data["alignment_report"]["review_required"] is True
+    assert data["alignment_report"]["association_summary"]["ocr_measure_blocked_count"] == 2
+    assert data["alignment_report"]["association_summary"]["ocr_measure_average_confidence_score"] == 0.0
+    assert any(blocker["code"] == "ocr_measure_association_blocked" for blocker in data["alignment_report"]["blockers"])
 
 
 def test_image_google_vision_success_with_mocked_adc(monkeypatch):
