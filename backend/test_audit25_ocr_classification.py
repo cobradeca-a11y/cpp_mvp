@@ -61,7 +61,7 @@ def test_audit25_preserves_unassigned_layout_and_counts_classifications():
 
     fusion = build_initial_fusion(protocol)
 
-    assert fusion["version"] == "audit-25"
+    assert fusion["version"] == "audit-26.1"
     assert fusion["status"] == "evidence_indexed_needs_layout_mapping"
     assert fusion["classification_counts"] == {
         "instrument_label": 1,
@@ -79,3 +79,39 @@ def test_audit25_preserves_unassigned_layout_and_counts_classifications():
         }
         for indexed in fusion["text_blocks_index"]
     )
+
+
+def test_audit26_1_groups_ocr_blocks_by_visual_line_without_measure_assignment():
+    protocol = {
+        "source": {"omr_status": "success"},
+        "ocr": {
+            "status": "success",
+            "text_blocks": [
+                {"text": "Was", "bbox": {"vertices": [{"x": 10, "y": 100}, {"x": 40, "y": 100}, {"x": 40, "y": 112}, {"x": 10, "y": 112}]}, "page": 1},
+                {"text": "ist", "bbox": {"vertices": [{"x": 48, "y": 101}, {"x": 70, "y": 101}, {"x": 70, "y": 113}, {"x": 48, "y": 113}]}, "page": 1},
+                {"text": "Liebe", "bbox": {"vertices": [{"x": 12, "y": 150}, {"x": 52, "y": 150}, {"x": 52, "y": 162}, {"x": 12, "y": 162}]}, "page": 1},
+            ],
+        },
+        "systems": [],
+        "measures": [{"id": "m1"}],
+    }
+
+    fusion = build_initial_fusion(protocol)
+
+    assert len(fusion["text_line_groups"]) == 2
+    assert fusion["text_line_groups"][0]["text"] == "Was ist"
+    assert fusion["text_line_groups"][0]["text_block_ids"] == ["fx0001", "fx0002"]
+    assert fusion["text_line_groups"][0]["bbox"] == {
+        "x_min": 10.0,
+        "y_min": 100.0,
+        "x_max": 70.0,
+        "y_max": 113.0,
+        "width": 60.0,
+        "height": 13.0,
+    }
+    assert fusion["text_line_groups"][0]["assignment"] == {
+        "system_id": None,
+        "measure_id": None,
+        "status": "unassigned_no_musicxml_layout",
+    }
+    assert fusion["text_line_groups"][1]["text"] == "Liebe"
