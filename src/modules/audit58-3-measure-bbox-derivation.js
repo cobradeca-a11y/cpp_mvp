@@ -1,4 +1,4 @@
-const AUDIT583_BUILD = "audit-58-3-cache-v1";
+const AUDIT583_BUILD = "audit-58-3-cache-v2";
 const STORAGE_KEY = "cpp_professional_omr_protocol_v1";
 
 function byId(id) { return document.getElementById(id); }
@@ -26,12 +26,7 @@ function bboxFrom(value) {
 
 function normalizeBBox(bbox) {
   if (!bbox) return null;
-  return {
-    x: Math.round(bbox.x * 100) / 100,
-    y: Math.round(bbox.y * 100) / 100,
-    w: Math.round(bbox.w * 100) / 100,
-    h: Math.round(bbox.h * 100) / 100,
-  };
+  return { x: Math.round(bbox.x * 100) / 100, y: Math.round(bbox.y * 100) / 100, w: Math.round(bbox.w * 100) / 100, h: Math.round(bbox.h * 100) / 100 };
 }
 
 function systemId(system, index) { return system?.system_id || system?.id || `s${String(index + 1).padStart(3, "0")}`; }
@@ -62,13 +57,6 @@ function deriveFromBarlines(systemBBox, barlineXs, index, total) {
   return null;
 }
 
-function deriveFromSystemEvenSplit(systemBBox, index, total) {
-  if (!systemBBox || total <= 0) return null;
-  const width = systemBBox.w / total;
-  if (!Number.isFinite(width) || width <= 0) return null;
-  return { bbox: normalizeBBox({ x: systemBBox.x + width * index, y: systemBBox.y, w: width, h: systemBBox.h }), source: "system_bbox_even_measure_distribution", confidence: 0.45, status: "approximate", review_required: true };
-}
-
 function groupMeasuresBySystem(protocol) {
   const groups = new Map();
   asArray(protocol.measures).forEach((measure, index) => {
@@ -84,7 +72,7 @@ function deriveMeasureBBoxes() {
   protocol.measures = asArray(protocol.measures);
   protocol.systems = asArray(protocol.systems);
   protocol.geometry_contract ||= {};
-  protocol.geometry_contract.audit_58_3 = { version: "audit-58.3", applied_at: new Date().toISOString(), rule: "Derive measure bbox only from existing system geometry and/or existing barline evidence.", fallback_policy: "Even system split is approximate and always review_required=true." };
+  protocol.geometry_contract.audit_58_3 = { version: "audit-58.3", applied_at: new Date().toISOString(), rule: "Derive measure bbox only from existing measure bbox or explicit barline evidence.", fallback_policy: "No even-width geometric inference. Keep pending when barlines are unavailable." };
   const systems = new Map(protocol.systems.map((system, index) => [systemId(system, index), system]));
   const groups = groupMeasuresBySystem(protocol);
   const derivations = [];
@@ -105,13 +93,13 @@ function deriveMeasureBBoxes() {
         derivations.push({ measure_id: measure.measure_id, method: "preserved_existing_measure_bbox", status: measure.geometry.status });
         return;
       }
-      const derived = deriveFromBarlines(systemBBox, barlineXs, localIndex, total) || deriveFromSystemEvenSplit(systemBBox, localIndex, total);
+      const derived = deriveFromBarlines(systemBBox, barlineXs, localIndex, total);
       if (derived) {
         measure.geometry = { ...measure.geometry, page: measure.page, system_id: measure.system_id, bbox: derived.bbox, source: derived.source, confidence: derived.confidence, status: derived.status, review_required: derived.review_required, audit: "audit-58.3" };
         derivations.push({ measure_id: measure.measure_id, method: derived.source, status: derived.status });
       } else {
-        measure.geometry = { ...measure.geometry, page: measure.page, system_id: measure.system_id, bbox: null, source: "missing_system_bbox_or_barline_evidence", confidence: 0, status: "pending", review_required: true, audit: "audit-58.3" };
-        derivations.push({ measure_id: measure.measure_id, method: "pending_no_geometry_evidence", status: "pending" });
+        measure.geometry = { ...measure.geometry, page: measure.page, system_id: measure.system_id, bbox: null, source: "pending_no_explicit_barline_or_measure_bbox", confidence: 0, status: "pending", review_required: true, audit: "audit-58.3" };
+        derivations.push({ measure_id: measure.measure_id, method: "pending_no_explicit_barline_or_measure_bbox", status: "pending" });
       }
     });
   });
@@ -127,15 +115,15 @@ function buildReport(protocol = loadProtocol(), derivations = [], saved = false)
     acc[status] = (acc[status] || 0) + 1;
     if (measure?.geometry?.bbox) acc.with_bbox += 1;
     if (measure?.geometry?.source === "barline_positions_from_protocol") acc.from_barlines += 1;
-    if (measure?.geometry?.source === "system_bbox_even_measure_distribution") acc.from_even_split += 1;
     if (measure?.geometry?.source === "existing_measure_bbox_preserved") acc.preserved_existing += 1;
+    if (measure?.geometry?.source === "system_bbox_even_measure_distribution") acc.blocked_even_split_legacy += 1;
     return acc;
-  }, { reliable: 0, approximate: 0, pending: 0, present_unrated: 0, missing: 0, with_bbox: 0, from_barlines: 0, from_even_split: 0, preserved_existing: 0 });
-  return { export_type: "cpp_measure_bbox_derivation_report", audit: "audit-58.3", generated_at: new Date().toISOString(), frontend: { build: AUDIT583_BUILD }, source: { file_name: source.file_name || "", file_type: source.file_type || "", omr_status: source.omr_status || "pending", ocr_status: source.ocr_status || protocol?.ocr?.status || "pending" }, summary: { protocol_saved: saved, measures_total: measures.length, ...summary, review_required: measures.filter(measure => measure?.geometry?.review_required !== false).length }, derivations: derivations.slice(0, 300), safety_contract: { modifies_protocol: true, modification_scope: "metadata_only_measure_geometry_bbox", modifies_ocr_raw_text: false, infers_lyrics: false, infers_harmony: false, uses_existing_barline_or_system_geometry_only: true, aligns_ocr_to_measure_without_geometry: false, marks_playable_ready_automatically: false, applies_human_review_without_user_action: false } };
+  }, { reliable: 0, approximate: 0, pending: 0, present_unrated: 0, missing: 0, with_bbox: 0, from_barlines: 0, preserved_existing: 0, blocked_even_split_legacy: 0 });
+  return { export_type: "cpp_measure_bbox_derivation_report", audit: "audit-58.3", generated_at: new Date().toISOString(), frontend: { build: AUDIT583_BUILD }, source: { file_name: source.file_name || "", file_type: source.file_type || "", omr_status: source.omr_status || "pending", ocr_status: source.ocr_status || protocol?.ocr?.status || "pending" }, summary: { protocol_saved: saved, measures_total: measures.length, ...summary, from_even_split: 0, review_required: measures.filter(measure => measure?.geometry?.review_required !== false).length }, derivations: derivations.slice(0, 300), safety_contract: { modifies_protocol: true, modification_scope: "metadata_only_measure_geometry_bbox", modifies_ocr_raw_text: false, infers_lyrics: false, infers_harmony: false, uses_existing_barline_or_system_geometry_only: false, uses_explicit_barline_or_existing_measure_bbox_only: true, disables_even_width_measure_inference: true, aligns_ocr_to_measure_without_geometry: false, marks_playable_ready_automatically: false, applies_human_review_without_user_action: false } };
 }
 
 function humanReport(report) {
-  return ["DETECÇÃO/DERIVAÇÃO DE BBOX POR COMPASSO — AUDITORIA 58.3", "", `Arquivo: ${report.source.file_name || "nenhum protocolo salvo"}`, `Build: ${report.frontend.build}`, `Protocolo salvo: ${report.summary.protocol_saved ? "sim" : "não"}`, "", "Resumo:", `- Compassos: ${report.summary.measures_total}`, `- Com bbox: ${report.summary.with_bbox}`, `- Reliable: ${report.summary.reliable}`, `- Approximate: ${report.summary.approximate}`, `- Pending: ${report.summary.pending}`, `- Preservados existentes: ${report.summary.preserved_existing}`, `- Derivados por barras: ${report.summary.from_barlines}`, `- Derivados por divisão aproximada do sistema: ${report.summary.from_even_split}`, `- Exigem revisão: ${report.summary.review_required}`, "", "Contrato:", "- Usa apenas geometria já existente de sistemas/medidas/barras no protocolo.", "- Divisão uniforme do sistema é aproximada e exige revisão.", "- Não altera OCR bruto.", "- Não infere letra.", "- Não infere harmonia.", "- Não associa OCR a compasso sem geometria confiável.", "- Não marca automaticamente pronto para cifra tocável."].join("\n");
+  return ["DETECÇÃO/DERIVAÇÃO DE BBOX POR COMPASSO — AUDITORIA 58.3", "", `Arquivo: ${report.source.file_name || "nenhum protocolo salvo"}`, `Build: ${report.frontend.build}`, `Protocolo salvo: ${report.summary.protocol_saved ? "sim" : "não"}`, "", "Resumo:", `- Compassos: ${report.summary.measures_total}`, `- Com bbox: ${report.summary.with_bbox}`, `- Reliable: ${report.summary.reliable}`, `- Approximate: ${report.summary.approximate}`, `- Pending: ${report.summary.pending}`, `- Preservados existentes: ${report.summary.preserved_existing}`, `- Derivados por barras explícitas: ${report.summary.from_barlines}`, `- Derivados por divisão aproximada do sistema: 0`, `- Exigem revisão: ${report.summary.review_required}`, "", "Contrato:", "- Usa apenas bbox de compasso existente ou barras explícitas do protocolo.", "- Não usa divisão uniforme do sistema por risco de inferência geométrica.", "- Não altera OCR bruto.", "- Não infere letra.", "- Não infere harmonia.", "- Não associa OCR a compasso sem geometria confiável.", "- Não marca automaticamente pronto para cifra tocável."].join("\n");
 }
 
 function downloadText(filename, text, mime = "application/json;charset=utf-8") {
@@ -156,7 +144,7 @@ function createPanel() {
   const section = document.createElement("section");
   section.id = "measureBboxDerivationAudit583";
   section.className = "panel active";
-  section.innerHTML = `<h2>3J. Derivação real de bbox por compasso</h2><p class="hint">Auditoria 58.3: deriva bbox a partir de barras existentes ou geometria de sistema. Divisão uniforme é aproximada e sempre exige revisão humana.</p><div class="toolbar sticky"><button id="btnDeriveMeasureBboxes" class="primary">Derivar bbox por compasso</button><button id="btnExportMeasureBboxDerivation" class="ghost">Exportar derivação JSON</button></div><pre id="measureBboxDerivationOutput" class="report small-report">Derivação de bbox ainda não executada nesta sessão.</pre>`;
+  section.innerHTML = `<h2>3J. Derivação real de bbox por compasso</h2><p class="hint">Auditoria 58.3: deriva bbox somente a partir de bbox existente ou barras explícitas no protocolo. Não usa divisão uniforme por sistema.</p><div class="toolbar sticky"><button id="btnDeriveMeasureBboxes" class="primary">Derivar bbox por compasso</button><button id="btnExportMeasureBboxDerivation" class="ghost">Exportar derivação JSON</button></div><pre id="measureBboxDerivationOutput" class="report small-report">Derivação de bbox ainda não executada nesta sessão.</pre>`;
   anchor.insertAdjacentElement("afterend", section);
 }
 
