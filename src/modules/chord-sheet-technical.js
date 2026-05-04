@@ -4,6 +4,7 @@ export function generateTechnicalChordSheet(protocol) {
   lines.push(`Tom: ${protocol.music.key || ""} | Compasso padrão: ${protocol.music.meter_default || ""} | Andamento: ${protocol.music.tempo || ""}`);
   lines.push("");
 
+  appendChordLayerSeparationSection(lines, protocol);
   appendApprovedLyricsSection(lines, protocol);
   appendApprovedChordCandidatesSection(lines, protocol);
 
@@ -25,6 +26,28 @@ export function generateTechnicalChordSheet(protocol) {
   const out = lines.join("\n");
   protocol.outputs.technical_chord_sheet = out;
   return out;
+}
+
+function appendChordLayerSeparationSection(lines, protocol) {
+  const detectedChords = getDetectedChordBlocks(protocol);
+  const approvedChords = getApprovedChordBlocks(protocol);
+  const playableStatus = getPlayableChordLayerStatus(protocol, approvedChords);
+
+  lines.push("CAMADAS DE CIFRA — AUDITORIA 42");
+  lines.push("Regra: cifra detectada ≠ cifra aprovada ≠ cifra tocável.");
+  lines.push(`Cifra detectada: ${detectedChords.length} candidato(s) OCR/Fusion.`);
+  lines.push(`Cifra aprovada: ${approvedChords.length} candidato(s) com aprovação humana.`);
+  lines.push(`Cifra tocável: ${playableStatus}`);
+  lines.push("Obs.: nenhuma camada é promovida automaticamente para outra.");
+  lines.push("");
+}
+
+function getPlayableChordLayerStatus(protocol, approvedChords) {
+  if (!approvedChords.length) return "bloqueada — sem cifra aprovada";
+  const measureAssociations = protocol.ocr_measure_associations?.associations || [];
+  const hasAssignedMeasure = measureAssociations.some(item => item.association_status === "assigned_to_measure" && item.confidence_score > 0);
+  if (!hasAssignedMeasure) return "bloqueada — sem alinhamento OCR→compasso confiável";
+  return "pendente de geração tocável validada";
 }
 
 function appendApprovedLyricsSection(lines, protocol) {
@@ -70,6 +93,11 @@ function appendApprovedChordCandidatesSection(lines, protocol) {
   }
   lines.push("Obs.: cifras aprovadas permanecem sem alinhamento automático com sistema ou compasso.");
   lines.push("");
+}
+
+function getDetectedChordBlocks(protocol) {
+  const blocks = protocol.fusion?.text_blocks_index || [];
+  return blocks.filter(block => block.classification === "possible_chord");
 }
 
 function getApprovedLyricBlocks(protocol) {
