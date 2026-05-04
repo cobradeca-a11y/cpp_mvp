@@ -5,6 +5,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from ocr_cache import cache_key_for_image, cached_text_blocks, write_ocr_cache
+
 OCR_SUPPORTED_FILE_TYPES = {"pdf", "png", "jpg", "jpeg", "webp"}
 OCR_IMAGE_FILE_TYPES = {"png", "jpg", "jpeg", "webp"}
 OCR_NOT_APPLICABLE_FILE_TYPES = {"xml", "musicxml", "mxl"}
@@ -13,8 +15,6 @@ PDF_CONVERSION_DPI = 220
 
 
 def configured_ocr_engine_cmd() -> str:
-    # Auditoria 22: OCR_ENGINE is the public configuration name.
-    # OCR_ENGINE_CMD remains accepted for backward compatibility with Audit 21.
     return (os.getenv("OCR_ENGINE") or os.getenv("OCR_ENGINE_CMD") or "").strip().strip('"')
 
 
@@ -32,9 +32,9 @@ def create_empty_ocr_contract(status: str = "pending", engine: str = "") -> dict
 def build_ocr_contract(source_path: str | Path | None = None, source_name: str = "", file_type: str = "") -> dict[str, Any]:
     """Return an explicit OCR evidence contract without faking OCR results.
 
-    Audit 45 supports local PDF OCR by converting each PDF page to an image
-    before running Google Vision. Page origin must be preserved in every text
-    block. If conversion or OCR fails, no text is invented.
+    Audit 46 adds OCR cache by image/page hash. Cached OCR is reused only when
+    the exact image/page content and OCR settings match. Cached blocks are not
+    modified except for the already explicit page normalization in PDF flow.
     """
     normalized_type = normalize_file_type(file_type or suffix_to_file_type(source_name))
 
@@ -80,8 +80,17 @@ def run_google_vision_image_ocr(source_path: Path | None) -> dict[str, Any]:
         contract["warnings"].append("Arquivo de entrada OCR não encontrado.")
         return contract
 
+    feature = configured_ocr_feature()
+    cache_key = cache_key_for_image(source_path, GOOGLE_VISION_ENGINE, feature)
+    cached = cached_text_blocks(cache_key)
+    if cached is not None:
+        contract = create_empty_ocr_contract(status="success", engine=GOOGLE_VISION_ENGINE)
+        contract["text_blocks"] = normalize_ocr_pages(cached, default_page=1)
+        contract["warnings"].append("OCR carregado do cache audit-46 por hash de imagem.")
+        return contract
+
     try:
-        text_blocks = _run_google_vision_image(source_path, configured_ocr_feature())
+        text_blocks = _run_google_vision_image(source_path, feature)
     except ImportError:
         contract = create_empty_ocr_contract(status="unavailable", engine=GOOGLE_VISION_ENGINE)
         contract["warnings"].append("Dependência google-cloud-vision não instalada no ambiente.")
@@ -95,8 +104,11 @@ def run_google_vision_image_ocr(source_path: Path | None) -> dict[str, Any]:
         )
         return contract
 
+    text_blocks = normalize_ocr_pages(text_blocks, default_page=1)
+    write_ocr_cache(cache_key, text_blocks, {"engine": GOOGLE_VISION_ENGINE, "feature": feature, "page": 1})
+
     contract = create_empty_ocr_contract(status="success", engine=GOOGLE_VISION_ENGINE)
-    contract["text_blocks"] = normalize_ocr_pages(text_blocks, default_page=1)
+    contract["text_blocks"] = text_blocks
     if not text_blocks:
         contract["warnings"].append("Google Vision executou, mas não retornou blocos de texto.")
     if not os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "").strip().strip('"'):
@@ -114,6 +126,10 @@ def run_google_vision_pdf_ocr(source_path: Path | None) -> dict[str, Any]:
         contract["warnings"].append("Arquivo PDF de entrada OCR não encontrado.")
         return contract
 
+    feature = configured_ocr_feature()
+    cache_hits = 0
+    cache_misses = 0
+
     try:
         with tempfile.TemporaryDirectory(prefix="cpp_pdf_pages_") as tmp:
             page_images = convert_pdf_to_page_images(source_path, Path(tmp))
@@ -126,8 +142,18 @@ def run_google_vision_pdf_ocr(source_path: Path | None) -> dict[str, Any]:
             warnings: list[str] = []
             for page_number, image_path in page_images:
                 try:
-                    page_blocks = _run_google_vision_image(image_path, configured_ocr_feature())
-                    all_blocks.extend(normalize_ocr_pages(page_blocks, default_page=page_number, force_page=True))
+                    cache_key = cache_key_for_image(image_path, GOOGLE_VISION_ENGINE, feature, page=page_number)
+                    cached = cached_text_blocks(cache_key)
+                    if cached is not None:
+                        cache_hits += 1
+                        all_blocks.extend(normalize_ocr_pages(cached, default_page=page_number, force_page=True))
+                        continue
+
+                    cache_misses += 1
+                    page_blocks = _run_google_vision_image(image_path, feature)
+                    page_blocks = normalize_ocr_pages(page_blocks, default_page=page_number, force_page=True)
+                    write_ocr_cache(cache_key, page_blocks, {"engine": GOOGLE_VISION_ENGINE, "feature": feature, "page": page_number})
+                    all_blocks.extend(page_blocks)
                 except Exception as exc:  # pragma: no cover - external API/runtime path
                     warnings.append(f"Falha no OCR da página {page_number}: {exc}")
     except ImportError as exc:
@@ -142,6 +168,7 @@ def run_google_vision_pdf_ocr(source_path: Path | None) -> dict[str, Any]:
     contract = create_empty_ocr_contract(status="success" if all_blocks else "failed", engine=GOOGLE_VISION_ENGINE)
     contract["text_blocks"] = all_blocks
     contract["warnings"].append("PDF convertido página→imagem para OCR local. Origem de página preservada em cada bloco OCR.")
+    contract["warnings"].append(f"Cache OCR audit-46: {cache_hits} hit(s), {cache_misses} miss(es).")
     contract["warnings"].extend(warnings)
     if not all_blocks:
         contract["warnings"].append("Google Vision executou nas páginas convertidas, mas não retornou blocos de texto.")
@@ -160,12 +187,6 @@ def validate_google_credentials() -> dict[str, Any] | None:
 
 
 def convert_pdf_to_page_images(source_path: Path, output_dir: Path) -> list[tuple[int, Path]]:
-    """Convert PDF pages to PNG images using PyMuPDF when available.
-
-    The function returns `(page_number, image_path)` pairs with 1-based page
-    numbers. It is intentionally isolated so tests can monkeypatch it without
-    requiring a real PDF renderer.
-    """
     try:
         import fitz  # type: ignore
     except ImportError as exc:  # pragma: no cover - dependency availability path
