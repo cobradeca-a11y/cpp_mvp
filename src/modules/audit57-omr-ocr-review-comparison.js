@@ -1,4 +1,4 @@
-const AUDIT57_BUILD = "audit-57-cache-v1";
+const AUDIT57_BUILD = "audit-57-cache-v2";
 const STORAGE_KEY = "cpp_professional_omr_protocol_v1";
 
 function byId(id) {
