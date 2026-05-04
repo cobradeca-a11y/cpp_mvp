@@ -5,6 +5,7 @@ export function generateTechnicalChordSheet(protocol) {
   lines.push("");
 
   appendApprovedLyricsSection(lines, protocol);
+  appendApprovedChordCandidatesSection(lines, protocol);
 
   const measures = (protocol.measures || []).slice().sort((a,b) => a.number - b.number);
   for (const m of measures) {
@@ -48,6 +49,29 @@ function appendApprovedLyricsSection(lines, protocol) {
   lines.push("");
 }
 
+function appendApprovedChordCandidatesSection(lines, protocol) {
+  const approvedChords = getApprovedChordBlocks(protocol);
+  lines.push("CIFRAS APROVADAS — AUDITORIA 41");
+  lines.push("Fonte: somente cifras candidatas OCR aprovadas por revisão humana.");
+
+  if (!approvedChords.length) {
+    lines.push("[lacuna] Nenhuma cifra OCR aprovada para uso técnico.");
+    lines.push("Obs.: harmonia não será inferida; cifra detectada não vira cifra final sem aprovação humana.");
+    lines.push("");
+    return;
+  }
+
+  for (const block of approvedChords) {
+    const page = block.page || "?";
+    const id = block.fusion_id || "sem_id";
+    const text = block.normalized_text || block.text || "";
+    const analysis = block.chord_analysis ? formatChordAnalysisSummary(block.chord_analysis) : "análise estrutural indisponível";
+    lines.push(`[OCR ${id} | pág. ${page}] ${text} — ${analysis}`);
+  }
+  lines.push("Obs.: cifras aprovadas permanecem sem alinhamento automático com sistema ou compasso.");
+  lines.push("");
+}
+
 function getApprovedLyricBlocks(protocol) {
   const blocks = protocol.fusion?.text_blocks_index || [];
   return blocks.filter(block => {
@@ -55,6 +79,23 @@ function getApprovedLyricBlocks(protocol) {
     const classification = block.classification;
     return status === "classification_approved" && isLyricLikeClassification(classification);
   });
+}
+
+function getApprovedChordBlocks(protocol) {
+  const blocks = protocol.fusion?.text_blocks_index || [];
+  return blocks.filter(block => {
+    const status = block.human_review?.status;
+    return status === "classification_approved" && block.classification === "possible_chord";
+  });
+}
+
+function formatChordAnalysisSummary(analysis) {
+  const parts = [];
+  if (analysis.kind) parts.push(`tipo=${analysis.kind}`);
+  if (analysis.root) parts.push(`raiz=${analysis.root}`);
+  if (analysis.extension) parts.push(`extensão=${analysis.extension}`);
+  if (analysis.bass) parts.push(`baixo=${analysis.bass}`);
+  return parts.length ? parts.join(", ") : "análise estrutural sem campos principais";
 }
 
 function isLyricLikeClassification(classification) {
