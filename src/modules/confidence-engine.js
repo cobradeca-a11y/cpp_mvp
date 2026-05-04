@@ -101,3 +101,86 @@ export function globalUncertaintyReport(protocol) {
   if (lines.length === 2) lines.push("Nenhuma incerteza registrada.");
   return lines.join("\n");
 }
+
+export function musicalConfidenceReport(protocol) {
+  const lines = ["RELATÓRIO DE CONFIANÇA MUSICAL — AUDITORIA 44", ""];
+  const measures = protocol.measures || [];
+  const reviews = protocol.review || [];
+  const fusionBlocks = protocol.fusion?.text_blocks_index || [];
+  const measureAssociations = protocol.ocr_measure_associations?.associations || [];
+  const systemAssociations = protocol.ocr_system_associations?.associations || [];
+
+  const approvedLyrics = fusionBlocks.filter(block => block.human_review?.status === "classification_approved" && isLyricLikeClassification(block.classification));
+  const approvedChords = fusionBlocks.filter(block => block.human_review?.status === "classification_approved" && block.classification === "possible_chord");
+  const detectedChords = fusionBlocks.filter(block => block.classification === "possible_chord");
+  const blockedSystem = systemAssociations.filter(item => String(item.association_status || "").startsWith("blocked_")).length;
+  const blockedMeasure = measureAssociations.filter(item => String(item.association_status || "").startsWith("blocked_")).length;
+  const reliableMeasureAssociations = measureAssociations.filter(item => item.association_status === "assigned_to_measure" && Number(item.confidence_score || 0) > 0).length;
+
+  lines.push("Resumo geral");
+  lines.push(`- Compassos: ${measures.length}`);
+  lines.push(`- Blocos OCR/Fusion: ${fusionBlocks.length}`);
+  lines.push(`- Cifras detectadas: ${detectedChords.length}`);
+  lines.push(`- Letras aprovadas: ${approvedLyrics.length}`);
+  lines.push(`- Cifras aprovadas: ${approvedChords.length}`);
+  lines.push(`- Decisões humanas registradas: ${reviews.length}`);
+  lines.push(`- OCR→sistema bloqueados: ${blockedSystem}`);
+  lines.push(`- OCR→compasso bloqueados: ${blockedMeasure}`);
+  lines.push(`- OCR→compasso confiáveis: ${reliableMeasureAssociations}`);
+  lines.push("");
+
+  lines.push("Camadas musicais");
+  lines.push(`- Detectada: ${detectedChords.length ? "há evidência OCR/Fusion" : "sem cifra detectada"}`);
+  lines.push(`- Aprovada: ${approvedChords.length ? "há cifra aprovada por humano" : "bloqueada — sem cifra aprovada"}`);
+  lines.push(`- Tocável: ${getPlayableLayerConfidenceStatus(approvedChords, reliableMeasureAssociations)}`);
+  lines.push("");
+
+  lines.push("Lacunas por compasso");
+  if (!measures.length) {
+    lines.push("- [lacuna] Nenhum compasso disponível para avaliar.");
+  } else {
+    for (const measure of measures.slice().sort((a, b) => a.number - b.number)) {
+      const gaps = getMeasureConfidenceGaps(protocol, measure, approvedLyrics, approvedChords, measureAssociations);
+      lines.push(`- Compasso ${measure.number}: ${gaps.length ? gaps.join("; ") : "sem lacuna técnica nesta camada"}`);
+    }
+  }
+  lines.push("");
+
+  lines.push("Regra conservadora");
+  lines.push("- Este relatório não preenche lacunas.");
+  lines.push("- Este relatório não infere letra.");
+  lines.push("- Este relatório não infere harmonia.");
+  lines.push("- Este relatório não promove cifra detectada para aprovada ou tocável.");
+
+  return lines.join("\n");
+}
+
+function getPlayableLayerConfidenceStatus(approvedChords, reliableMeasureAssociations) {
+  if (!approvedChords.length) return "bloqueada — sem cifra aprovada";
+  if (!reliableMeasureAssociations) return "bloqueada — sem alinhamento OCR→compasso confiável";
+  return "pendente — exige geração tocável validada";
+}
+
+function getMeasureConfidenceGaps(protocol, measure, approvedLyrics, approvedChords, measureAssociations) {
+  const gaps = [];
+  const measureId = measure.id || measure.measure_id || null;
+  const measureNumber = measure.number;
+  const hasReliableMeasureAssociation = measureAssociations.some(item => {
+    const sameId = measureId && item.candidate_measure_id === measureId;
+    const sameNumber = measureNumber !== undefined && item.candidate_measure_number === measureNumber;
+    return item.association_status === "assigned_to_measure" && Number(item.confidence_score || 0) > 0 && (sameId || sameNumber);
+  });
+
+  if (!approvedLyrics.length) gaps.push("sem letra aprovada");
+  if (!approvedChords.length) gaps.push("sem cifra aprovada");
+  if (!hasReliableMeasureAssociation) gaps.push("sem alinhamento OCR→compasso confiável");
+  return gaps;
+}
+
+function isLyricLikeClassification(classification) {
+  return [
+    "possible_lyric",
+    "lyric_syllable_fragment",
+    "lyric_hyphen_or_continuation",
+  ].includes(classification);
+}
