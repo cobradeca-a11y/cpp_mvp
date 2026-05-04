@@ -65,6 +65,9 @@ def assert_ocr_contract(data, expected_status):
     assert isinstance(data["ocr"]["possible_chords"], list)
     assert isinstance(data["ocr"]["possible_lyrics"], list)
     assert isinstance(data["ocr"]["warnings"], list)
+    assert isinstance(data["ocr"]["multipage_status"], str)
+    assert isinstance(data["ocr"]["page_count"], int)
+    assert isinstance(data["ocr"]["pages"], list)
 
 
 def assert_fusion_contract(data):
@@ -179,6 +182,7 @@ def test_pdf_returns_professional_protocol_when_audiveris_unavailable(monkeypatc
     assert data["ocr"]["text_blocks"] == []
     assert data["ocr"]["possible_chords"] == []
     assert data["ocr"]["possible_lyrics"] == []
+    assert data["ocr"]["multipage_status"] == "not_processed"
     assert data["fusion"]["status"] == "no_ocr_text"
     assert data["layout"]["status"] == "no_layout_subjects"
     assert data["ocr_system_associations"]["status"] == "no_ocr_regions"
@@ -210,6 +214,7 @@ def test_musicxml_without_namespace_imports_measures():
     assert data["source"]["file_type"] == "musicxml"
     assert data["source"]["omr_status"] == "musicxml_parsed"
     assert_professional_contracts(data, "not_applicable")
+    assert data["ocr"]["multipage_status"] == "not_processed"
     assert data["fusion"]["status"] == "no_ocr_text"
     assert data["layout"]["status"] == "geometry_unavailable"
     assert data["layout"]["page_count"] == 1
@@ -265,6 +270,7 @@ def test_image_google_vision_adc_failure_is_reported(monkeypatch):
     assert data["source"]["file_type"] == "png"
     assert_professional_contracts(data, "failed")
     assert data["ocr"]["engine"] == "google_vision"
+    assert data["ocr"]["multipage_status"] == "not_processed"
     assert "gcloud auth application-default login" in data["ocr"]["warnings"][0]
     assert data["measures"] == []
 
@@ -291,6 +297,7 @@ def test_pdf_google_vision_without_page_conversion_dependency_is_reported(monkey
     assert data["source"]["file_type"] == "pdf"
     assert_professional_contracts(data, "unavailable")
     assert data["ocr"]["engine"] == "google_vision"
+    assert data["ocr"]["multipage_status"] == "not_processed"
     assert "PDF→imagem" in data["ocr"]["warnings"][0]
     assert data["ocr"]["text_blocks"] == []
     assert data["measures"] == []
@@ -346,6 +353,12 @@ def test_pdf_google_vision_converts_pages_and_preserves_page_origin(monkeypatch,
     assert data["source"]["file_type"] == "pdf"
     assert_professional_contracts(data, "success")
     assert data["ocr"]["engine"] == "google_vision"
+    assert data["ocr"]["multipage_status"] == "multipage_processed"
+    assert data["ocr"]["page_count"] == 2
+    assert data["ocr"]["pages"] == [
+        {"page": 1, "ocr_status": "success", "text_block_count": 1},
+        {"page": 2, "ocr_status": "success", "text_block_count": 1},
+    ]
     assert [block["text"] for block in data["ocr"]["text_blocks"]] == ["Am", "Glória"]
     assert [block["page"] for block in data["ocr"]["text_blocks"]] == [1, 2]
     assert "PDF convertido página→imagem" in data["ocr"]["warnings"][0]
@@ -393,6 +406,9 @@ def test_pdf_google_vision_uses_page_cache_without_repeating_ocr(monkeypatch, tm
         assert response.status_code == 200
         data = response.json()
         assert_professional_contracts(data, "success")
+        assert data["ocr"]["multipage_status"] == "single_page_processed"
+        assert data["ocr"]["page_count"] == 1
+        assert data["ocr"]["pages"] == [{"page": 1, "ocr_status": "success", "text_block_count": 1}]
         assert data["ocr"]["text_blocks"][0]["page"] == 1
 
     assert calls["vision"] == 1
@@ -431,6 +447,8 @@ def test_image_google_vision_uses_cache_without_repeating_ocr(monkeypatch, tmp_p
         assert response.status_code == 200
         data = response.json()
         assert_professional_contracts(data, "success")
+        assert data["ocr"]["multipage_status"] == "single_page_processed"
+        assert data["ocr"]["page_count"] == 1
         assert data["ocr"]["text_blocks"][0]["text"] == "Glória"
 
     assert calls["vision"] == 1
@@ -476,6 +494,9 @@ def test_image_google_vision_success_with_mocked_json_credentials(monkeypatch, t
     assert data["source"]["file_type"] == "png"
     assert_professional_contracts(data, "success")
     assert data["ocr"]["engine"] == "google_vision"
+    assert data["ocr"]["multipage_status"] == "single_page_processed"
+    assert data["ocr"]["page_count"] == 1
+    assert data["ocr"]["pages"] == [{"page": 1, "ocr_status": "success", "text_block_count": 2}]
     assert data["ocr"]["text_blocks"][0]["text"] == "Am"
     assert data["source"]["ocr_status"] == "success"
     assert data["measures"] == []
@@ -549,6 +570,7 @@ def test_image_google_vision_success_with_mocked_adc(monkeypatch, tmp_path):
     assert data["source"]["file_type"] == "jpg"
     assert_professional_contracts(data, "success")
     assert data["ocr"]["engine"] == "google_vision"
+    assert data["ocr"]["multipage_status"] == "single_page_processed"
     assert data["ocr"]["text_blocks"][0]["text"] == "Glória"
     assert "Application Default Credentials" in data["ocr"]["warnings"][0]
     assert data["measures"] == []
