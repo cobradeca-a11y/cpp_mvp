@@ -92,16 +92,17 @@ function markBuild() {
   if (build) build.textContent = `Frontend build: ${AUDIT57_CLEAR_BUILD}`;
 }
 
-function loadAudit583Patch() {
+function loadAudit58GeometryPatches() {
   setTimeout(() => {
     import("./audit58-3-measure-bbox-derivation.js").catch(() => {});
+    import("./audit58-4-manual-barline-adjustment.js").catch(() => {});
   }, 250);
 }
 
 function initAudit57ClearSavedStatePatch() {
   markBuild();
   bindClearButton();
-  loadAudit583Patch();
+  loadAudit58GeometryPatches();
 }
 
 if (document.readyState === "loading") {
