@@ -1,24 +1,24 @@
-const APP_BUILD = "audit-50-cache-v2";
+const APP_BUILD = "audit-50-cache-v3";
 const CACHE_NAME = `cpp-professional-omr-${APP_BUILD}`;
 
 const ASSETS = [
   "./",
-  "./index.html?v=audit-50-cache-v2",
-  "./manifest.json?v=audit-50-cache-v2",
-  "./src/styles.css?v=audit-50-cache-v2",
-  "./src/app.js?v=audit-50-cache-v2",
-  "./src/modules/cpp-json.js?v=audit-50-cache-v2",
-  "./src/modules/file-input.js?v=audit-50-cache-v2",
-  "./src/modules/professional-omr-client.js?v=audit-50-cache-v2",
-  "./src/modules/feedback-engine.js?v=audit-50-cache-v2",
-  "./src/modules/measure-review.js?v=audit-50-cache-v2",
-  "./src/modules/chord-sheet-technical.js?v=audit-50-cache-v2",
-  "./src/modules/chord-sheet-playable.js?v=audit-50-cache-v2",
-  "./src/modules/confidence-engine.js?v=audit-50-cache-v2",
-  "./src/modules/navigation-engine.js?v=audit-50-cache-v2",
-  "./src/modules/export-output.js?v=audit-50-cache-v2",
-  "./src/modules/multipage-audit-export.js?v=audit-50-cache-v2",
-  "./src/modules/error-reporting.js?v=audit-50-cache-v2"
+  "./index.html?v=audit-50-cache-v3",
+  "./manifest.json?v=audit-50-cache-v3",
+  "./src/styles.css?v=audit-50-cache-v3",
+  "./src/app-audit50.js?v=audit-50-cache-v3",
+  "./src/modules/cpp-json.js?v=audit-50-cache-v3",
+  "./src/modules/file-input.js?v=audit-50-cache-v3",
+  "./src/modules/professional-omr-client.js?v=audit-50-cache-v3",
+  "./src/modules/feedback-engine.js?v=audit-50-cache-v3",
+  "./src/modules/measure-review.js?v=audit-50-cache-v3",
+  "./src/modules/chord-sheet-technical.js?v=audit-50-cache-v3",
+  "./src/modules/chord-sheet-playable.js?v=audit-50-cache-v3",
+  "./src/modules/confidence-engine.js?v=audit-50-cache-v3",
+  "./src/modules/navigation-engine.js?v=audit-50-cache-v3",
+  "./src/modules/export-output.js?v=audit-50-cache-v3",
+  "./src/modules/multipage-audit-export.js?v=audit-50-cache-v3",
+  "./src/modules/error-reporting.js?v=audit-50-cache-v3"
 ];
 
 self.addEventListener("install", event => {
