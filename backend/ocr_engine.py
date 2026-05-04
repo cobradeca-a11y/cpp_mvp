@@ -127,7 +127,7 @@ def run_google_vision_pdf_ocr(source_path: Path | None) -> dict[str, Any]:
             for page_number, image_path in page_images:
                 try:
                     page_blocks = _run_google_vision_image(image_path, configured_ocr_feature())
-                    all_blocks.extend(normalize_ocr_pages(page_blocks, default_page=page_number))
+                    all_blocks.extend(normalize_ocr_pages(page_blocks, default_page=page_number, force_page=True))
                 except Exception as exc:  # pragma: no cover - external API/runtime path
                     warnings.append(f"Falha no OCR da página {page_number}: {exc}")
     except ImportError as exc:
@@ -186,11 +186,11 @@ def convert_pdf_to_page_images(source_path: Path, output_dir: Path) -> list[tupl
     return page_images
 
 
-def normalize_ocr_pages(text_blocks: list[dict[str, Any]], default_page: int) -> list[dict[str, Any]]:
+def normalize_ocr_pages(text_blocks: list[dict[str, Any]], default_page: int, force_page: bool = False) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for block in text_blocks:
         copied = dict(block)
-        copied["page"] = int(copied.get("page") or default_page)
+        copied["page"] = int(default_page if force_page else (copied.get("page") or default_page))
         copied.setdefault("source", "ocr")
         out.append(copied)
     return out
