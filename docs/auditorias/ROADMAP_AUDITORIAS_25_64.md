@@ -7,13 +7,14 @@ Objetivo geral: evoluir o Conversor Profissional de Partituras de um núcleo OCR
 ## Estado consolidado atual
 
 ```txt
-Auditorias 25–44 — validadas e registradas
-Marcos 1–4 — fechados
-Última validação confirmada: 15 passed in 0.57s
-Último commit validado: 1ee599e Record audit 44 musical confidence report validation
+Auditorias 25–49 — validadas e registradas
+Marcos 1–5 — fechados
+Última validação confirmada: 18 passed in 0.62s
+Último commit validado: da840c7 Record audit 49 multipage export validation
+Frontend build atual: audit-49-cache-v1
 Branch: main
 origin/main: sincronizado
-Próxima auditoria: Auditoria 45 — OCR de PDF por conversão página→imagem
+Próxima auditoria: Auditoria 50 — Tratamento de erros profissional no frontend
 ```
 
 ## Marcos fechados
@@ -23,6 +24,7 @@ Marco 1 — Núcleo OCR/Fusion textual profissional — Auditorias 25–29 — f
 Marco 2 — Núcleo geométrico MusicXML + OCR — Auditorias 30–34 — fechado
 Marco 3 — Núcleo de revisão humana auditável — Auditorias 35–39 — fechado
 Marco 4 — Núcleo de cifra técnica confiável — Auditorias 40–44 — fechado
+Marco 5 — Núcleo PDF/multipágina/cache/custo — Auditorias 45–49 — fechado
 ```
 
 ## Estado confirmado antes deste roadmap
@@ -90,11 +92,11 @@ Auditoria 44 — Gerar relatório de confiança musical — validada
 ## BLOCO E — PDF e múltiplas páginas
 
 ```txt
-Auditoria 45 — OCR de PDF por conversão página→imagem
-Auditoria 46 — Cache OCR por hash de arquivo/página
-Auditoria 47 — Processamento multipágina
-Auditoria 48 — Associação página→sistema→compasso
-Auditoria 49 — Exportação multipágina auditável
+Auditoria 45 — OCR de PDF por conversão página→imagem — validada
+Auditoria 46 — Cache OCR por hash de arquivo/página — validada
+Auditoria 47 — Processamento multipágina — validada
+Auditoria 48 — Associação página→sistema→compasso — validada
+Auditoria 49 — Exportação multipágina auditável — validada
 ```
 
 ## BLOCO F — Qualidade, produto e robustez
@@ -156,13 +158,13 @@ Auditorias 40–44 — fechado
 ### Marco 5 — Núcleo PDF/multipágina/cache/custo
 
 ```txt
-Auditorias 45–49 — próximo
+Auditorias 45–49 — fechado
 ```
 
 ### Marco 6 — Núcleo operacional robusto
 
 ```txt
-Auditorias 50–54
+Auditorias 50–54 — próximo
 ```
 
 ### Marco 7 — Núcleo de validação musical assistida
