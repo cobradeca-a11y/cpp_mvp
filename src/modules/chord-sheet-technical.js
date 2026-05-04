@@ -19,6 +19,7 @@ export function generateTechnicalChordSheet(protocol) {
     lines.push(`Tempo:    ${(m.time_grid || []).map(x => String(x).padEnd(8)).join("")}`);
     lines.push(`Acorde:   ${formatByGrid(m.time_grid, chords)}`);
     lines.push(`Sílaba:   ${formatByGrid(m.time_grid, sylls)}`);
+    lines.push(`Lacunas:  ${formatMeasureGaps(protocol, m)}`);
     lines.push(`Conf.:    ${m.confidence || "provável"}`);
     if (m.alignment_warnings?.length) lines.push(`Obs.:     ${m.alignment_warnings.map(w => w.message || w.type).join("; ")}`);
     lines.push("");
@@ -93,6 +94,31 @@ function appendApprovedChordCandidatesSection(lines, protocol) {
   }
   lines.push("Obs.: cifras aprovadas permanecem sem alinhamento automático com sistema ou compasso.");
   lines.push("");
+}
+
+function formatMeasureGaps(protocol, measure) {
+  const gaps = getMeasureGaps(protocol, measure);
+  if (!gaps.length) return "nenhuma lacuna técnica detectada nesta camada";
+  return gaps.map(gap => gap.label).join("; ");
+}
+
+function getMeasureGaps(protocol, measure) {
+  const gaps = [];
+  const approvedLyrics = getApprovedLyricBlocks(protocol);
+  const approvedChords = getApprovedChordBlocks(protocol);
+  const measureAssociations = protocol.ocr_measure_associations?.associations || [];
+  const measureId = measure.id || measure.measure_id || null;
+  const measureNumber = measure.number;
+  const hasReliableMeasureAssociation = measureAssociations.some(item => {
+    const sameId = measureId && item.candidate_measure_id === measureId;
+    const sameNumber = measureNumber !== undefined && item.candidate_measure_number === measureNumber;
+    return item.association_status === "assigned_to_measure" && item.confidence_score > 0 && (sameId || sameNumber);
+  });
+
+  if (!approvedLyrics.length) gaps.push({ code: "missing_approved_lyrics", label: "sem letra aprovada" });
+  if (!approvedChords.length) gaps.push({ code: "missing_approved_chords", label: "sem cifra aprovada" });
+  if (!hasReliableMeasureAssociation) gaps.push({ code: "missing_reliable_ocr_measure_alignment", label: "sem alinhamento OCR→compasso confiável" });
+  return gaps;
 }
 
 function getDetectedChordBlocks(protocol) {
