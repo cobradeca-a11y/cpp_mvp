@@ -7,15 +7,14 @@ Objetivo geral: evoluir o Conversor Profissional de Partituras de um núcleo OCR
 ## Estado consolidado atual
 
 ```txt
-Auditorias 25–53 — validadas e registradas
-Marcos 1–5 — fechados
-Marco 6 — iniciado
-Última validação confirmada: 18 passed
-Último commit validado: f028e81 Record audit 53 technical log export validation
-Frontend build atual: audit-53-cache-v1
+Auditorias 25–54 — validadas e registradas
+Marcos 1–6 — fechados
+Última validação confirmada: 18 passed, 5 warnings
+Último commit validado: 3afd3bf Record audit 54 full diagnostics validation
+Frontend build atual: audit-54-cache-v1
 Branch: main
 origin/main: sincronizado
-Próxima auditoria: Auditoria 54 — Modo diagnóstico completo
+Próxima auditoria: Auditoria 55 — IA validadora estrutural sem alterar protocolo
 ```
 
 ## Marcos fechados
@@ -26,6 +25,7 @@ Marco 2 — Núcleo geométrico MusicXML + OCR — Auditorias 30–34 — fechad
 Marco 3 — Núcleo de revisão humana auditável — Auditorias 35–39 — fechado
 Marco 4 — Núcleo de cifra técnica confiável — Auditorias 40–44 — fechado
 Marco 5 — Núcleo PDF/multipágina/cache/custo — Auditorias 45–49 — fechado
+Marco 6 — Núcleo operacional robusto — Auditorias 50–54 — fechado
 ```
 
 ## Estado confirmado antes deste roadmap
@@ -107,7 +107,7 @@ Auditoria 50 — Tratamento de erros profissional no frontend — validada
 Auditoria 51 — Fila/estado de processamento — validada
 Auditoria 52 — Cancelamento seguro de processamento preso — validada
 Auditoria 53 — Logs técnicos exportáveis — validada
-Auditoria 54 — Modo diagnóstico completo
+Auditoria 54 — Modo diagnóstico completo — validada
 ```
 
 ## BLOCO G — Validação musical assistida
@@ -165,14 +165,13 @@ Auditorias 45–49 — fechado
 ### Marco 6 — Núcleo operacional robusto
 
 ```txt
-Auditorias 50–53 — validadas
-Auditoria 54 — próximo
+Auditorias 50–54 — fechado
 ```
 
 ### Marco 7 — Núcleo de validação musical assistida
 
 ```txt
-Auditorias 55–59
+Auditorias 55–59 — próximo
 ```
 
 ### Marco 8 — Consolidação profissional com repertório real
