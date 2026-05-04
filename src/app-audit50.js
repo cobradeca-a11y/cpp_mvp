@@ -1,4 +1,4 @@
-const BUILD = 'audit-58-5-cache-v1';
+const BUILD = 'audit-59-cache-v1';
 const STORAGE_KEY = 'cpp_professional_omr_protocol_v1';
 const $ = id => document.getElementById(id);
 
@@ -39,8 +39,7 @@ function fallbackLoadProtocol() {
 
 function fallbackSaveProtocol(value) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitizeLegacyProtocol(value || emptyProtocol())));
-}
-
+}\n
 function esc(value) {
   return String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
 }
