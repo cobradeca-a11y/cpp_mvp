@@ -1,22 +1,21 @@
 # Roadmap de Auditorias CPP — 25 a 64
 
-Este documento registra o andamento planejado do CPP após a validação das Auditorias 25 e 26.
+Este documento registra o ciclo inicial de evolução do CPP_PRO.
 
-Objetivo geral: evoluir o Conversor Profissional de Partituras de um núcleo OCR/Fusion textual conservador até um fluxo profissional auditável com revisão humana, geometria, cifra técnica confiável, multipágina, robustez operacional e validação assistida.
+Objetivo geral: evoluir o Conversor Profissional de Partituras de um núcleo OCR/Fusion textual conservador até um fluxo profissional auditável com revisão humana, geometria, cifra técnica confiável, multipágina, robustez operacional, validação assistida e fechamento operacional inicial.
 
-## Estado consolidado atual
+## Estado consolidado final
 
 ```txt
-Auditorias 25–63 — validadas/registradas
-Marcos 1–7 — fechados
-Marco 8 — iniciado
-Última validação confirmada: 18 passed
-Último commit validado: fd46022 Record audit 63 real repertoire validation
-Frontend build atual: audit-60-cache-v1
-Service worker cache atual: audit-60-cache-v1
+Auditorias 25–64 — concluídas/registradas
+Marcos 1–8 — fechados
+Última validação confirmada antes do fechamento: 18 passed
+Último commit validado antes do fechamento: 6553668 Record audit 64 final corrections
+Frontend build funcional consolidado: audit-60-cache-v1
+Service worker cache funcional consolidado: audit-60-cache-v1
 Branch: main
 origin/main: sincronizado
-Próxima auditoria: Auditoria 64 — Correções finais do cpp-pro
+Ciclo 25–64: fechado
 ```
 
 ## Marcos fechados
@@ -26,9 +25,10 @@ Marco 1 — Núcleo OCR/Fusion textual profissional — Auditorias 25–29 — f
 Marco 2 — Núcleo geométrico MusicXML + OCR — Auditorias 30–34 — fechado
 Marco 3 — Núcleo de revisão humana auditável — Auditorias 35–39 — fechado
 Marco 4 — Núcleo de cifra técnica confiável — Auditorias 40–44 — fechado
-Marco 5 — Núcleo PDF/multipágina/cache/custo — fechado
+Marco 5 — Núcleo PDF/multipágina/cache/custo — Auditorias 45–49 — fechado
 Marco 6 — Núcleo operacional robusto — Auditorias 50–54 — fechado
 Marco 7 — Núcleo de validação musical assistida — Auditorias 55–59 — fechado
+Marco 8 — Consolidação profissional com repertório real — Auditorias 60–64 — fechado
 ```
 
 ## Estado confirmado antes deste roadmap
@@ -135,7 +135,7 @@ Auditoria 60 — Pacote de exportação final — validada
 Auditoria 61 — Manual de uso local — registrada
 Auditoria 62 — Checklist de validação por louvor — registrada
 Auditoria 63 — Validação profissional com repertório real inicial — registrada
-Auditoria 64 — Correções finais do cpp-pro
+Auditoria 64 — Correções finais do cpp-pro — registrada
 ```
 
 ## Marcos
@@ -185,16 +185,12 @@ Auditorias 55–59 — fechado
 ### Marco 8 — Consolidação profissional com repertório real
 
 ```txt
-Auditoria 60 — validada
-Auditoria 61 — registrada
-Auditoria 62 — registrada
-Auditoria 63 — registrada
-Auditoria 64 — próxima
+Auditorias 60–64 — fechado
 ```
 
 ## Regra permanente de execução
 
-Toda auditoria deve preservar os princípios de segurança do CPP:
+Toda auditoria preservou os princípios de segurança do CPP:
 
 ```txt
 Não inventar harmonia.
@@ -203,15 +199,23 @@ Não alinhar por compasso sem geometria confiável.
 Toda evidência incerta deve permanecer pendente para revisão humana.
 ```
 
-## Critério de fechamento de cada auditoria
-
-Cada auditoria deve terminar com:
+## Decisão final do ciclo
 
 ```txt
-1. implementação incremental;
-2. testes automatizados quando aplicável;
-3. validação local;
-4. registro em docs/auditorias;
-5. commit de validação;
-6. indicação da próxima auditoria.
+CPP_PRO = conversor/revisor/exportador auditável com revisão humana obrigatória para decisões musicais finais.
+```
+
+O sistema não deve ser tratado como gerador automático final de cifra tocável.
+
+## Continuação fora do ciclo 25–64
+
+Próximas frentes possíveis:
+
+```txt
+- validar mais repertório real;
+- melhorar usabilidade visual da revisão manual;
+- criar ferramenta gráfica para barras/compassos;
+- estudar aprendizagem assistida por correções humanas;
+- manter qualquer modelo futuro como sugestão, não aplicação automática;
+- evoluir exportação tocável somente após base de revisão suficiente.
 ```
