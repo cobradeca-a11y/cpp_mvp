@@ -1,4 +1,4 @@
-const BUILD = 'audit-50-cache-v4';
+const BUILD = 'audit-58-4-cache-v1';
 const STORAGE_KEY = 'cpp_professional_omr_protocol_v1';
 const $ = id => document.getElementById(id);
 
@@ -19,17 +19,26 @@ function emptyProtocol() {
   };
 }
 
+function sanitizeLegacyProtocol(value) {
+  const merged = { ...emptyProtocol(), ...(value || {}) };
+  merged.source = { ...emptyProtocol().source, ...(value?.source || {}) };
+  merged.music = { ...emptyProtocol().music, ...(value?.music || {}) };
+  const hasLoadedFile = Boolean(merged.source?.file_name) || (Array.isArray(merged.measures) && merged.measures.length > 0);
+  if (!hasLoadedFile && merged.music?.meter_default === '3/4') merged.music.meter_default = '';
+  return merged;
+}
+
 function fallbackLoadProtocol() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? { ...emptyProtocol(), ...JSON.parse(raw) } : emptyProtocol();
+    return raw ? sanitizeLegacyProtocol(JSON.parse(raw)) : emptyProtocol();
   } catch {
     return emptyProtocol();
   }
 }
 
 function fallbackSaveProtocol(value) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(value || emptyProtocol()));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitizeLegacyProtocol(value || emptyProtocol())));
 }
 
 function esc(value) {
@@ -111,7 +120,7 @@ function validateSelectedFile(file) {
 
 function saveProtocolSafe() {
   try {
-    if (mods.saveProtocol) mods.saveProtocol(protocol);
+    if (mods.saveProtocol) mods.saveProtocol(sanitizeLegacyProtocol(protocol));
     else fallbackSaveProtocol(protocol);
   } catch (error) {
     logError(error, { category: 'storage_error', operation: 'saveProtocol' });
@@ -121,7 +130,7 @@ function saveProtocolSafe() {
 
 function loadProtocolSafe() {
   try {
-    protocol = mods.loadProtocol ? mods.loadProtocol() : fallbackLoadProtocol();
+    protocol = mods.loadProtocol ? sanitizeLegacyProtocol(mods.loadProtocol()) : fallbackLoadProtocol();
   } catch (error) {
     logError(error, { category: 'storage_error', operation: 'loadProtocol' });
     protocol = fallbackLoadProtocol();
@@ -249,6 +258,9 @@ function versionedSafe(base, ext) {
 
 async function clearCache() {
   toast('Limpando cache do app...');
+  localStorage.removeItem(STORAGE_KEY);
+  sessionStorage.removeItem(STORAGE_KEY);
+  protocol = emptyProtocol();
   if ('serviceWorker' in navigator) {
     const regs = await navigator.serviceWorker.getRegistrations();
     await Promise.all(regs.map(reg => reg.unregister()));
@@ -407,10 +419,13 @@ async function initAudit50() {
   setText('frontendBuild', `Frontend build: ${BUILD}`);
   hydrateButtons();
   hydrateFileInput();
+  const meter = $('meterDefault');
+  if (meter && !selectedFile) meter.value = '';
   window.addEventListener('error', event => logError(event.error || event.message, { category: 'frontend_runtime', source: event.filename, line: event.lineno }));
   window.addEventListener('unhandledrejection', event => logError(event.reason || 'Promise rejeitada sem tratamento', { category: 'frontend_promise' }));
   await loadModules();
   refreshAll();
+  if (meter && !protocol?.source?.file_name) meter.value = '';
   setText('processingStatus', 'Aguardando arquivo.');
 }
 
