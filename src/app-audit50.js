@@ -1,4 +1,4 @@
-const BUILD = 'audit-65-cache-v2';
+const BUILD = 'audit-66-cache-v2';
 const STORAGE_KEY = 'cpp_professional_omr_protocol_v1';
 const $ = id => document.getElementById(id);
 
@@ -169,7 +169,7 @@ function generateOutputs() {
   protocol.outputs.technical_chord_sheet = protocol.outputs.technical_chord_sheet || `CIFRA TÉCNICA — ${protocol.music?.title || 'Sem título'}\nTom: ${protocol.music?.key || ''} | Compasso padrão: ${protocol.music?.meter_default || ''} | Andamento: ${protocol.music?.tempo || ''}\n\nSaída técnica depende de evidências aprovadas.`;
   protocol.outputs.playable_chord_sheet = protocol.outputs.playable_chord_sheet || `${protocol.music?.title || 'Sem título'}\n\nCifra tocável bloqueada até liberação humana explícita.`;
   protocol.outputs.uncertainty_report = protocol.outputs.uncertainty_report || 'RELATÓRIO DE INCERTEZAS\n\nSem saída recalculada nesta sessão.';
-  protocol.outputs.detection_report = protocol.outputs.detection_report || 'RELATÓRIO DE DETECÇÃO\n\nSem saída recalculada nesta sessão.';
+  protocol.outputs.detection_report = protocol.outputs.detection_report || protocol.outputs.automatic_musical_product || 'RELATÓRIO DE DETECÇÃO\n\nSem saída recalculada nesta sessão.';
   setText('technicalOutput', protocol.outputs.technical_chord_sheet);
   setText('playableOutput', protocol.outputs.playable_chord_sheet);
   setText('uncertaintyOutput', protocol.outputs.uncertainty_report);
@@ -182,6 +182,10 @@ function refreshAll() {
   renderBlocks();
   renderReviews();
   generateOutputs();
+}
+
+function notifyProtocolProcessed() {
+  window.dispatchEvent(new CustomEvent('cpp:protocol-processed', { detail: { source: protocol?.source || {}, measures: protocol?.measures?.length || 0 } }));
 }
 
 function downloadText(filename, text, mime = 'text/plain;charset=utf-8') {
@@ -241,6 +245,7 @@ async function processOmr() {
     setText('processingStatus', ['Processamento concluído.', `Arquivo: ${protocol.source?.file_name || file.name}`, `Status OMR: ${protocol.source?.omr_status || 'pending'}`, `Status OCR: ${protocol.source?.ocr_status || protocol.ocr?.status || 'pending'}`, `Compassos importados: ${protocol.measures?.length || 0}`].join('\n'));
     measureIndex = 0; ocrIndex = 0; reviewIndex = 0;
     refreshAll();
+    notifyProtocolProcessed();
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Processar com OMR Profissional'; }
   }
@@ -250,11 +255,12 @@ function addReview(type, decision) {
   const m = measures()[measureIndex];
   if (!m) return;
   protocol.review ||= [];
-  protocol.review.push({ id: `${type}-${Date.now()}`, audit: 'audit-65-shell', type, target_id: m.measure_id || m.id || null, decision, reviewed_at: new Date().toISOString(), effects: { evidence_changed: false } });
+  protocol.review.push({ id: `${type}-${Date.now()}`, audit: 'audit-66-shell', type, target_id: m.measure_id || m.id || null, decision, reviewed_at: new Date().toISOString(), effects: { evidence_changed: false } });
   if (decision === 'accept') m.review_status = 'approved';
   if (decision === 'uncertain') m.review_status = 'needs_fix';
   saveProtocol(protocol);
   refreshAll();
+  notifyProtocolProcessed();
 }
 
 function bindButtons() {
@@ -267,20 +273,20 @@ function bindButtons() {
   bindSafe('btnMarkUncertain', () => addReview('measure_review', 'uncertain'));
   bindSafe('btnPrevOcrBlock', () => { ocrIndex = Math.max(0, ocrIndex - 1); renderBlocks(); });
   bindSafe('btnNextOcrBlock', () => { ocrIndex = Math.min(Math.max(blocks().length - 1, 0), ocrIndex + 1); renderBlocks(); });
-  bindSafe('btnApproveOcrClassification', () => toast('Use revisão dedicada por JSON para esta etapa.'));
-  bindSafe('btnRejectOcrClassification', () => toast('Use revisão dedicada por JSON para esta etapa.'));
-  bindSafe('btnConfirmOcrSystemState', () => toast('Use revisão dedicada por JSON para esta etapa.'));
-  bindSafe('btnRejectOcrSystemState', () => toast('Use revisão dedicada por JSON para esta etapa.'));
-  bindSafe('btnConfirmOcrMeasureState', () => toast('Use revisão dedicada por JSON para esta etapa.'));
-  bindSafe('btnRejectOcrMeasureState', () => toast('Use revisão dedicada por JSON para esta etapa.'));
-  bindSafe('btnGenerateOutputs', () => { generateOutputs(); saveProtocol(protocol); });
-  bindSafe('btnExportJson', () => downloadText(versioned('protocolo_cpp', 'json'), JSON.stringify(protocol, null, 2), 'application/json;charset=utf-8'));
+  bindSafe('btnApproveOcrClassification', () => toast('Use a mesa de revisão musical assistida para confirmar evidências.'));
+  bindSafe('btnRejectOcrClassification', () => toast('Use a mesa de revisão musical assistida para rejeitar evidências.'));
+  bindSafe('btnConfirmOcrSystemState', () => toast('Associação automática permanece bloqueada sem geometria confiável.'));
+  bindSafe('btnRejectOcrSystemState', () => toast('Associação automática permanece bloqueada sem geometria confiável.'));
+  bindSafe('btnConfirmOcrMeasureState', () => toast('Associação automática permanece bloqueada sem geometria confiável.'));
+  bindSafe('btnRejectOcrMeasureState', () => toast('Associação automática permanece bloqueada sem geometria confiável.'));
+  bindSafe('btnGenerateOutputs', () => { if (window.CPP_GENERATE_AUTOMATIC_MUSICAL_PRODUCT) window.CPP_GENERATE_AUTOMATIC_MUSICAL_PRODUCT(); else generateOutputs(); saveProtocol(protocol); });
+  bindSafe('btnExportJson', () => downloadText(versioned('protocolo_cpp', 'json'), JSON.stringify(loadProtocol(), null, 2), 'application/json;charset=utf-8'));
   bindSafe('btnExportTech', () => downloadText(versioned('cifra_tecnica', 'txt'), $('technicalOutput')?.textContent || ''));
   bindSafe('btnExportPlayable', () => downloadText(versioned('cifra_tocavel', 'txt'), $('playableOutput')?.textContent || ''));
   bindSafe('btnExportUncertainty', () => downloadText(versioned('relatorio_incertezas', 'txt'), $('uncertaintyOutput')?.textContent || ''));
   bindSafe('btnExportDetection', () => downloadText(versioned('relatorio_deteccao', 'txt'), $('detectionOutput')?.textContent || ''));
-  bindSafe('btnExportMultipageAudit', () => downloadText(versioned('exportacao_multipagina_auditavel', 'json'), JSON.stringify({ protocol }, null, 2), 'application/json;charset=utf-8'));
-  bindSafe('btnExportAll', () => downloadText(versioned('cpp_pacote_exportacao', 'json'), JSON.stringify({ protocol, outputs: protocol.outputs || {} }, null, 2), 'application/json;charset=utf-8'));
+  bindSafe('btnExportMultipageAudit', () => downloadText(versioned('exportacao_multipagina_auditavel', 'json'), JSON.stringify({ protocol: loadProtocol() }, null, 2), 'application/json;charset=utf-8'));
+  bindSafe('btnExportAll', () => downloadText(versioned('cpp_pacote_exportacao', 'json'), JSON.stringify({ protocol: loadProtocol(), outputs: loadProtocol().outputs || {} }, null, 2), 'application/json;charset=utf-8'));
   bindSafe('btnExportErrorLog', () => downloadText(versioned('log_erros_operacionais', 'txt'), $('frontendErrorLog')?.textContent || ''));
   bindSafe('btnClearErrorLog', () => setText('frontendErrorLog', 'Nenhum erro operacional registrado nesta sessão.'));
 }
