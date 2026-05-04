@@ -4,19 +4,27 @@
 
 ```txt
 Validada localmente pelo usuário com pytest e teste funcional no frontend.
+Correção v2 validada localmente pelo usuário.
 ```
 
 ## Validação local
 
 ```txt
 pytest
-18 passed
+18 passed, 5 warnings in 0.77s
+```
+
+Warnings observados:
+
+```txt
+DeprecationWarning relacionado a tipos SWIG/PyMuPDF durante testes existentes.
+Não bloqueou a validação.
 ```
 
 ## Frontend build
 
 ```txt
-audit-58-3-cache-v1
+audit-58-3-cache-v2
 ```
 
 ## Commits de implementação validados
@@ -25,6 +33,8 @@ audit-58-3-cache-v1
 cee1e45 Add audit 58.3 measure bbox derivation
 19e12b3 Load audit 58.3 bbox derivation patch
 d19f6f9 Update service worker cache for audit 58.3
+394a404 Remove even split fallback from audit 58.3
+0a83a2a Update service worker cache for audit 58.3 v2
 ```
 
 ## Evidência funcional — BeetAnGeSample.pdf
@@ -45,11 +55,11 @@ measure_geometry.pending: 15
 ocr_geometry.pending: 102
 ```
 
-### Auditoria 58.3
+### Auditoria 58.3 v2
 
 ```txt
 Arquivo: BeetAnGeSample.pdf
-Build: audit-58-3-cache-v1
+Build: audit-58-3-cache-v2
 Protocolo salvo: sim
 Compassos: 15
 Com bbox: 0
@@ -57,7 +67,7 @@ Reliable: 0
 Approximate: 0
 Pending: 15
 Preservados existentes: 0
-Derivados por barras: 0
+Derivados por barras explícitas: 0
 Derivados por divisão aproximada do sistema: 0
 Exigem revisão: 15
 ```
@@ -65,50 +75,46 @@ Exigem revisão: 15
 Derivações registradas:
 
 ```txt
-m001–m015: pending_no_geometry_evidence
+m001–m015: pending_no_explicit_barline_or_measure_bbox
+```
+
+## Correção v2 — remoção de inferência geométrica por divisão uniforme
+
+O usuário apontou corretamente que divisão uniforme por largura do sistema é inferência geométrica e pode errar em casos como:
+
+```txt
+- anacruse;
+- compassos de mesma fórmula de compasso com larguras editoriais diferentes;
+- densidade rítmica desigual;
+- cabeças de nota, pausas, acidentes, ligaduras, letras e cifras;
+- espaçamento editorial do PDF.
+```
+
+Por isso, a Auditoria 58.3 foi corrigida para remover o fallback `system_bbox_even_measure_distribution`.
+
+A regra v2 passa a ser:
+
+```txt
+Preservar bbox de compasso já existente.
+Derivar bbox apenas por barras explícitas existentes no protocolo.
+Sem barras explícitas ou bbox existente, manter pending.
+Não dividir sistemas em partes iguais.
 ```
 
 ## Análise do resultado
 
-A Auditoria 58.3 funcionou corretamente de forma conservadora.
+A Auditoria 58.3 v2 funcionou corretamente de forma conservadora.
 
-Ela tentou derivar bbox por compasso usando apenas evidências geométricas existentes:
+Ela não criou coordenadas falsas e manteve todos os compassos como pendentes quando não havia evidência explícita de barras ou bbox de compasso.
 
-```txt
-- bbox de compasso já existente;
-- posições de barras existentes no protocolo;
-- bbox de sistema para fallback aproximado por divisão uniforme.
-```
-
-Como o protocolo testado não tinha geometria de página, sistema, compasso ou OCR, a 58.3 manteve todos os compassos como pendentes.
-
-Isso confirma que a causa raiz atual não está na derivação por compasso em si, mas na ausência anterior de geometria de sistema/página/OCR no protocolo.
-
-## Observação técnica sobre divisão uniforme
-
-O usuário observou corretamente que dividir a largura do sistema em partes iguais não é musicalmente ideal.
-
-Em uma partitura real, mesmo em compassos 4/4, os compassos podem ter larguras visuais diferentes por causa de:
+Isso confirma que o caminho correto para o CPP não é geometria automática agressiva, mas:
 
 ```txt
-- quantidade de notas;
-- cabeças de nota;
-- acidentes;
-- pausas;
-- letras/cifras/elementos gráficos;
-- espaçamento editorial.
+- detecção conservadora;
+- revisão humana pontual;
+- registro auditável das correções;
+- uso da geometria apenas como suporte/evidência, não como palpite musical.
 ```
-
-Por isso, a regra da Auditoria 58.3 permanece conservadora:
-
-```txt
-system_bbox_even_measure_distribution
-confidence: 0.45
-status: approximate
-review_required: true
-```
-
-Ela só serve como fallback temporário de navegação/revisão, não como geometria confiável final.
 
 ## Contrato preservado
 
@@ -118,7 +124,8 @@ modification_scope: metadata_only_measure_geometry_bbox
 modifies_ocr_raw_text: false
 infers_lyrics: false
 infers_harmony: false
-uses_existing_barline_or_system_geometry_only: true
+uses_explicit_barline_or_existing_measure_bbox_only: true
+disables_even_width_measure_inference: true
 aligns_ocr_to_measure_without_geometry: false
 marks_playable_ready_automatically: false
 applies_human_review_without_user_action: false
@@ -126,26 +133,18 @@ applies_human_review_without_user_action: false
 
 ## Conclusão
 
-A Auditoria 58.3 está validada.
+A Auditoria 58.3 v2 está validada.
 
-Ela não criou coordenadas falsas e manteve `pending` quando não havia evidência geométrica suficiente.
+Ela preserva a diretriz do CPP: não inventar geometria, não inferir letra, não inferir harmonia e não alinhar OCR a compasso sem evidência confiável.
 
 ## Próxima auditoria recomendada
 
 ```txt
-Auditoria 58.3.1 — Extração/derivação de bbox de página e sistema
+Auditoria 58.4 — Ajuste manual rápido de barras/compassos
 ```
 
 Objetivo:
 
 ```txt
-Criar a geometria-base necessária para que a 58.3 consiga derivar bbox por compasso:
-- page.geometry.bbox;
-- system.geometry.bbox;
-- source;
-- confidence;
-- status;
-- review_required.
+Permitir correções humanas pontuais de barras/compassos, registrando source human_barline_review ou human_adjusted_bbox, sem depender de inferência geométrica agressiva.
 ```
-
-Essa etapa deve continuar sem inferir letra, cifra ou harmonia.
