@@ -1,30 +1,31 @@
-const APP_BUILD = "audit-55-cache-v1";
+const APP_BUILD = "audit-56-cache-v1";
 const CACHE_NAME = `cpp-professional-omr-${APP_BUILD}`;
 
 const ASSETS = [
   "./",
-  "./index.html?v=audit-55-cache-v1",
-  "./manifest.json?v=audit-55-cache-v1",
-  "./src/styles.css?v=audit-55-cache-v1",
-  "./src/app-audit50.js?v=audit-55-cache-v1",
-  "./src/modules/cpp-json.js?v=audit-55-cache-v1",
-  "./src/modules/file-input.js?v=audit-55-cache-v1",
-  "./src/modules/professional-omr-client.js?v=audit-55-cache-v1",
-  "./src/modules/feedback-engine.js?v=audit-55-cache-v1",
-  "./src/modules/measure-review.js?v=audit-55-cache-v1",
-  "./src/modules/chord-sheet-technical.js?v=audit-55-cache-v1",
-  "./src/modules/chord-sheet-playable.js?v=audit-55-cache-v1",
-  "./src/modules/confidence-engine.js?v=audit-55-cache-v1",
-  "./src/modules/navigation-engine.js?v=audit-55-cache-v1",
-  "./src/modules/export-output.js?v=audit-55-cache-v1",
-  "./src/modules/multipage-audit-export.js?v=audit-55-cache-v1",
-  "./src/modules/error-reporting.js?v=audit-55-cache-v1",
-  "./src/modules/audit50-ocr-warning-panel.js?v=audit-55-cache-v1",
-  "./src/modules/audit51-processing-state.js?v=audit-55-cache-v1",
-  "./src/modules/audit52-safe-cancel.js?v=audit-55-cache-v1",
-  "./src/modules/audit53-technical-logs.js?v=audit-55-cache-v1",
-  "./src/modules/audit54-full-diagnostics.js?v=audit-55-cache-v1",
-  "./src/modules/audit55-ai-structural-validator.js?v=audit-55-cache-v1"
+  "./index.html?v=audit-56-cache-v1",
+  "./manifest.json?v=audit-56-cache-v1",
+  "./src/styles.css?v=audit-56-cache-v1",
+  "./src/app-audit50.js?v=audit-56-cache-v1",
+  "./src/modules/cpp-json.js?v=audit-56-cache-v1",
+  "./src/modules/file-input.js?v=audit-56-cache-v1",
+  "./src/modules/professional-omr-client.js?v=audit-56-cache-v1",
+  "./src/modules/feedback-engine.js?v=audit-56-cache-v1",
+  "./src/modules/measure-review.js?v=audit-56-cache-v1",
+  "./src/modules/chord-sheet-technical.js?v=audit-56-cache-v1",
+  "./src/modules/chord-sheet-playable.js?v=audit-56-cache-v1",
+  "./src/modules/confidence-engine.js?v=audit-56-cache-v1",
+  "./src/modules/navigation-engine.js?v=audit-56-cache-v1",
+  "./src/modules/export-output.js?v=audit-56-cache-v1",
+  "./src/modules/multipage-audit-export.js?v=audit-56-cache-v1",
+  "./src/modules/error-reporting.js?v=audit-56-cache-v1",
+  "./src/modules/audit50-ocr-warning-panel.js?v=audit-56-cache-v1",
+  "./src/modules/audit51-processing-state.js?v=audit-56-cache-v1",
+  "./src/modules/audit52-safe-cancel.js?v=audit-56-cache-v1",
+  "./src/modules/audit53-technical-logs.js?v=audit-56-cache-v1",
+  "./src/modules/audit54-full-diagnostics.js?v=audit-56-cache-v1",
+  "./src/modules/audit55-ai-structural-validator.js?v=audit-56-cache-v1",
+  "./src/modules/audit56-ai-suggestions.js?v=audit-56-cache-v1"
 ];
 
 self.addEventListener("install", event => {
