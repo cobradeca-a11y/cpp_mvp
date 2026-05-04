@@ -1,42 +1,43 @@
-const APP_BUILD = "audit-60-cache-v1";
+const APP_BUILD = "audit-65-cache-v1";
 const CACHE_NAME = `cpp-professional-omr-${APP_BUILD}`;
 
 const ASSETS = [
   "./",
-  "./index.html?v=audit-60-cache-v1",
-  "./manifest.json?v=audit-60-cache-v1",
-  "./src/styles.css?v=audit-60-cache-v1",
-  "./src/app-audit50.js?v=audit-60-cache-v1",
-  "./src/modules/cpp-json.js?v=audit-60-cache-v1",
-  "./src/modules/file-input.js?v=audit-60-cache-v1",
-  "./src/modules/professional-omr-client.js?v=audit-60-cache-v1",
-  "./src/modules/feedback-engine.js?v=audit-60-cache-v1",
-  "./src/modules/measure-review.js?v=audit-60-cache-v1",
-  "./src/modules/chord-sheet-technical.js?v=audit-60-cache-v1",
-  "./src/modules/chord-sheet-playable.js?v=audit-60-cache-v1",
-  "./src/modules/confidence-engine.js?v=audit-60-cache-v1",
-  "./src/modules/navigation-engine.js?v=audit-60-cache-v1",
-  "./src/modules/export-output.js?v=audit-60-cache-v1",
-  "./src/modules/multipage-audit-export.js?v=audit-60-cache-v1",
-  "./src/modules/error-reporting.js?v=audit-60-cache-v1",
-  "./src/modules/audit50-ocr-warning-panel.js?v=audit-60-cache-v1",
-  "./src/modules/audit51-processing-state.js?v=audit-60-cache-v1",
-  "./src/modules/audit52-safe-cancel.js?v=audit-60-cache-v1",
-  "./src/modules/audit53-technical-logs.js?v=audit-60-cache-v1",
-  "./src/modules/audit54-full-diagnostics.js?v=audit-60-cache-v1",
-  "./src/modules/audit55-ai-structural-validator.js?v=audit-60-cache-v1",
-  "./src/modules/audit56-ai-suggestions.js?v=audit-60-cache-v1",
-  "./src/modules/audit56-cross-file-validation-patch.js?v=audit-60-cache-v1",
-  "./src/modules/audit57-omr-ocr-review-comparison.js?v=audit-60-cache-v1",
-  "./src/modules/audit57-clear-saved-state-patch.js?v=audit-60-cache-v1",
-  "./src/modules/audit58-measure-confidence-score.js?v=audit-60-cache-v1",
-  "./src/modules/audit58-1-review-readiness-gate.js?v=audit-60-cache-v1",
-  "./src/modules/audit58-2-explicit-measure-geometry.js?v=audit-60-cache-v1",
-  "./src/modules/audit58-3-measure-bbox-derivation.js?v=audit-60-cache-v1",
-  "./src/modules/audit58-4-manual-barline-adjustment.js?v=audit-60-cache-v1",
-  "./src/modules/audit58-5-measure-evidence-review.js?v=audit-60-cache-v1",
-  "./src/modules/audit59-playable-release.js?v=audit-60-cache-v1",
-  "./src/modules/audit60-final-export-package.js?v=audit-60-cache-v1"
+  "./index.html?v=audit-65-cache-v1",
+  "./manifest.json?v=audit-65-cache-v1",
+  "./src/styles.css?v=audit-65-cache-v1",
+  "./src/app-audit50.js?v=audit-65-cache-v1",
+  "./src/modules/cpp-json.js?v=audit-65-cache-v1",
+  "./src/modules/file-input.js?v=audit-65-cache-v1",
+  "./src/modules/professional-omr-client.js?v=audit-65-cache-v1",
+  "./src/modules/feedback-engine.js?v=audit-65-cache-v1",
+  "./src/modules/measure-review.js?v=audit-65-cache-v1",
+  "./src/modules/chord-sheet-technical.js?v=audit-65-cache-v1",
+  "./src/modules/chord-sheet-playable.js?v=audit-65-cache-v1",
+  "./src/modules/confidence-engine.js?v=audit-65-cache-v1",
+  "./src/modules/navigation-engine.js?v=audit-65-cache-v1",
+  "./src/modules/export-output.js?v=audit-65-cache-v1",
+  "./src/modules/multipage-audit-export.js?v=audit-65-cache-v1",
+  "./src/modules/error-reporting.js?v=audit-65-cache-v1",
+  "./src/modules/audit50-ocr-warning-panel.js?v=audit-65-cache-v1",
+  "./src/modules/audit51-processing-state.js?v=audit-65-cache-v1",
+  "./src/modules/audit52-safe-cancel.js?v=audit-65-cache-v1",
+  "./src/modules/audit53-technical-logs.js?v=audit-65-cache-v1",
+  "./src/modules/audit54-full-diagnostics.js?v=audit-65-cache-v1",
+  "./src/modules/audit55-ai-structural-validator.js?v=audit-65-cache-v1",
+  "./src/modules/audit56-ai-suggestions.js?v=audit-65-cache-v1",
+  "./src/modules/audit56-cross-file-validation-patch.js?v=audit-65-cache-v1",
+  "./src/modules/audit57-omr-ocr-review-comparison.js?v=audit-65-cache-v1",
+  "./src/modules/audit57-clear-saved-state-patch.js?v=audit-65-cache-v1",
+  "./src/modules/audit58-measure-confidence-score.js?v=audit-65-cache-v1",
+  "./src/modules/audit58-1-review-readiness-gate.js?v=audit-65-cache-v1",
+  "./src/modules/audit58-2-explicit-measure-geometry.js?v=audit-65-cache-v1",
+  "./src/modules/audit58-3-measure-bbox-derivation.js?v=audit-65-cache-v1",
+  "./src/modules/audit58-4-manual-barline-adjustment.js?v=audit-65-cache-v1",
+  "./src/modules/audit58-5-measure-evidence-review.js?v=audit-65-cache-v1",
+  "./src/modules/audit59-playable-release.js?v=audit-65-cache-v1",
+  "./src/modules/audit60-final-export-package.js?v=audit-65-cache-v1",
+  "./src/modules/audit65-assisted-musical-review-desk.js?v=audit-65-cache-v1"
 ];
 
 self.addEventListener("install", event => {
@@ -55,9 +56,7 @@ async function networkFirst(request) {
   const cache = await caches.open(CACHE_NAME);
   try {
     const response = await fetch(request, { cache: "no-store" });
-    if (response && response.ok) {
-      cache.put(request, response.clone());
-    }
+    if (response && response.ok) cache.put(request, response.clone());
     return response;
   } catch (error) {
     const cached = await cache.match(request, { ignoreSearch: true });
@@ -79,7 +78,6 @@ self.addEventListener("message", event => {
       })
     );
   }
-
   if (event.data?.type === "CPP_GET_BUILD") {
     event.source?.postMessage({ type: "CPP_BUILD", build: APP_BUILD, cache: CACHE_NAME });
   }
@@ -87,10 +85,8 @@ self.addEventListener("message", event => {
 
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
-
   const url = new URL(event.request.url);
   if (url.pathname.includes("/api/omr/") || url.pathname.endsWith("/health")) return;
-
   const destination = event.request.destination;
   const isFrontendAsset = ["document", "script", "style", "manifest"].includes(destination)
     || url.pathname.endsWith(".js")
@@ -98,13 +94,9 @@ self.addEventListener("fetch", event => {
     || url.pathname.endsWith(".html")
     || url.pathname.endsWith("/manifest.json")
     || url.pathname === "/";
-
   if (isFrontendAsset) {
     event.respondWith(networkFirst(event.request));
     return;
   }
-
-  event.respondWith(
-    caches.match(event.request, { ignoreSearch: true }).then(cached => cached || fetch(event.request).catch(() => cached))
-  );
+  event.respondWith(caches.match(event.request, { ignoreSearch: true }).then(cached => cached || fetch(event.request).catch(() => cached)));
 });
