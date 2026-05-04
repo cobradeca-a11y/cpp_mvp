@@ -92,20 +92,21 @@ function markBuild() {
   if (build) build.textContent = `Frontend build: ${AUDIT57_CLEAR_BUILD}`;
 }
 
-function loadAuditGeometryReleaseAndExportPatches() {
+function loadAuditGeometryReleaseExportAndReviewPatches() {
   setTimeout(() => {
     import("./audit58-3-measure-bbox-derivation.js").catch(() => {});
     import("./audit58-4-manual-barline-adjustment.js").catch(() => {});
     import("./audit58-5-measure-evidence-review.js").catch(() => {});
     import("./audit59-playable-release.js").catch(() => {});
     import("./audit60-final-export-package.js").catch(() => {});
+    import("./audit65-assisted-musical-review-desk.js").catch(() => {});
   }, 250);
 }
 
 function initAudit57ClearSavedStatePatch() {
   markBuild();
   bindClearButton();
-  loadAuditGeometryReleaseAndExportPatches();
+  loadAuditGeometryReleaseExportAndReviewPatches();
 }
 
 if (document.readyState === "loading") {
