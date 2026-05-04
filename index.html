@@ -156,11 +156,22 @@
     import { downloadText, versioned } from "./src/modules/export-output.js?v=audit-50-cache-v1";
     import { generateMultipageAuditExportText } from "./src/modules/multipage-audit-export.js?v=audit-50-cache-v1";
     import { appendOperationalError, exportOperationalErrorLogText } from "./src/modules/error-reporting.js?v=audit-50-cache-v1";
+    import { checkProfessionalOmrBackend } from "./src/modules/professional-omr-client.js?v=audit-50-cache-v1";
 
     const build = document.getElementById("frontendBuild");
     if (build) build.textContent = "Frontend build: audit-50-cache-v1";
 
     const errorLog = document.getElementById("frontendErrorLog");
+    const backendStatus = document.getElementById("backendStatus");
+    const toastBox = document.getElementById("toast");
+
+    function audit50Toast(message) {
+      if (!toastBox) return;
+      toastBox.textContent = message;
+      toastBox.classList.remove("hidden");
+      setTimeout(() => toastBox.classList.add("hidden"), 2600);
+    }
+
     const originalConsoleError = console.error.bind(console);
     console.error = (...args) => {
       originalConsoleError(...args);
@@ -174,6 +185,23 @@
     window.addEventListener("unhandledrejection", event => {
       appendOperationalError(errorLog, event.reason || "Promise rejeitada sem tratamento", { category: "frontend_promise" });
     });
+
+    const checkBackend = document.getElementById("btnCheckBackend");
+    if (checkBackend) {
+      checkBackend.addEventListener("click", async () => {
+        const backendUrl = document.getElementById("backendUrl")?.value?.trim() || "http://localhost:8787";
+        if (backendStatus) backendStatus.textContent = "Verificando backend...";
+        try {
+          const health = await checkProfessionalOmrBackend(backendUrl);
+          if (backendStatus) backendStatus.textContent = JSON.stringify(health, null, 2);
+          audit50Toast("Backend verificado.");
+        } catch (error) {
+          if (backendStatus) backendStatus.textContent = `Backend indisponível.\n${error.message || error}`;
+          appendOperationalError(errorLog, error, { category: "backend", operation: "health_check", backendUrl });
+          audit50Toast("Backend indisponível.");
+        }
+      });
+    }
 
     const button = document.getElementById("btnExportMultipageAudit");
     if (button) {
