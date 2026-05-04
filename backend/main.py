@@ -62,9 +62,9 @@ async def analyze_omr(file: UploadFile = File(...)) -> JSONResponse:
         tmpdir = Path(tmp)
         source = tmpdir / sanitize_filename(file.filename)
         source.write_bytes(await file.read())
-        ocr_contract = build_ocr_contract(source_path=source, source_name=file.filename, file_type=file_type)
 
         if suffix in {".xml", ".musicxml", ".mxl"}:
+            ocr_contract = build_ocr_contract(source_path=source, source_name=file.filename, file_type=file_type)
             protocol = parse_musicxml_to_cpp(source, source_name=file.filename)
             normalized = normalize_professional_protocol(
                 protocol,
@@ -81,8 +81,12 @@ async def analyze_omr(file: UploadFile = File(...)) -> JSONResponse:
                 file_type=file_type,
                 omr_status="unavailable",
                 message="Audiveris não está disponível neste ambiente. Instale/configure AUDIVERIS_CMD para executar OMR profissional.",
-                ocr_contract=ocr_contract,
+                ocr_contract=ocr_unavailable_contract(
+                    "OCR não executado porque o OMR profissional está indisponível nesta execução."
+                ),
             ))
+
+        ocr_contract = build_ocr_contract(source_path=source, source_name=file.filename, file_type=file_type)
 
         musicxml = run_audiveris(source, tmpdir)
         if not musicxml or not musicxml.exists():
@@ -111,6 +115,20 @@ def input_file_type(suffix: str) -> str:
 
 def audiveris_available() -> bool:
     return shutil.which(AUDIVERIS_CMD) is not None or Path(AUDIVERIS_CMD).exists()
+
+
+def ocr_unavailable_contract(message: str) -> dict[str, Any]:
+    return {
+        "status": "unavailable",
+        "engine": "",
+        "text_blocks": [],
+        "possible_chords": [],
+        "possible_lyrics": [],
+        "warnings": [message],
+        "multipage_status": "not_processed",
+        "page_count": 0,
+        "pages": [],
+    }
 
 
 def run_audiveris(source: Path, workdir: Path) -> Path | None:
