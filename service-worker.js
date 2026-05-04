@@ -1,24 +1,25 @@
-const APP_BUILD = "audit-50-cache-v4";
+const APP_BUILD = "audit-50-cache-v5";
 const CACHE_NAME = `cpp-professional-omr-${APP_BUILD}`;
 
 const ASSETS = [
   "./",
-  "./index.html?v=audit-50-cache-v4",
-  "./manifest.json?v=audit-50-cache-v4",
-  "./src/styles.css?v=audit-50-cache-v4",
-  "./src/app-audit50.js?v=audit-50-cache-v4",
-  "./src/modules/cpp-json.js?v=audit-50-cache-v4",
-  "./src/modules/file-input.js?v=audit-50-cache-v4",
-  "./src/modules/professional-omr-client.js?v=audit-50-cache-v4",
-  "./src/modules/feedback-engine.js?v=audit-50-cache-v4",
-  "./src/modules/measure-review.js?v=audit-50-cache-v4",
-  "./src/modules/chord-sheet-technical.js?v=audit-50-cache-v4",
-  "./src/modules/chord-sheet-playable.js?v=audit-50-cache-v4",
-  "./src/modules/confidence-engine.js?v=audit-50-cache-v4",
-  "./src/modules/navigation-engine.js?v=audit-50-cache-v4",
-  "./src/modules/export-output.js?v=audit-50-cache-v4",
-  "./src/modules/multipage-audit-export.js?v=audit-50-cache-v4",
-  "./src/modules/error-reporting.js?v=audit-50-cache-v4"
+  "./index.html?v=audit-50-cache-v5",
+  "./manifest.json?v=audit-50-cache-v5",
+  "./src/styles.css?v=audit-50-cache-v5",
+  "./src/app-audit50.js?v=audit-50-cache-v5",
+  "./src/modules/cpp-json.js?v=audit-50-cache-v5",
+  "./src/modules/file-input.js?v=audit-50-cache-v5",
+  "./src/modules/professional-omr-client.js?v=audit-50-cache-v5",
+  "./src/modules/feedback-engine.js?v=audit-50-cache-v5",
+  "./src/modules/measure-review.js?v=audit-50-cache-v5",
+  "./src/modules/chord-sheet-technical.js?v=audit-50-cache-v5",
+  "./src/modules/chord-sheet-playable.js?v=audit-50-cache-v5",
+  "./src/modules/confidence-engine.js?v=audit-50-cache-v5",
+  "./src/modules/navigation-engine.js?v=audit-50-cache-v5",
+  "./src/modules/export-output.js?v=audit-50-cache-v5",
+  "./src/modules/multipage-audit-export.js?v=audit-50-cache-v5",
+  "./src/modules/error-reporting.js?v=audit-50-cache-v5",
+  "./src/modules/audit50-ocr-warning-panel.js?v=audit-50-cache-v5"
 ];
 
 self.addEventListener("install", event => {
