@@ -7,16 +7,16 @@ Objetivo geral: evoluir o Conversor Profissional de Partituras de um núcleo OCR
 ## Estado consolidado atual
 
 ```txt
-Auditorias 25–60 — validadas e registradas
+Auditorias 25–61 — validadas/registradas
 Marcos 1–7 — fechados
 Marco 8 — iniciado
-Última validação confirmada: 18 passed, 5 warnings in 0.89s
-Último commit validado: 50c834b Record audit 60 final export package validation
+Última validação confirmada: 18 passed
+Último commit validado: 37c8ae3 Record audit 61 local usage manual
 Frontend build atual: audit-60-cache-v1
 Service worker cache atual: audit-60-cache-v1
 Branch: main
 origin/main: sincronizado
-Próxima auditoria: Auditoria 61 — Manual de uso local
+Próxima auditoria: Auditoria 62 — Checklist de validação por louvor
 ```
 
 ## Marcos fechados
@@ -132,7 +132,7 @@ Auditoria 59 — Modo “pronto para cifra tocável” — validada
 
 ```txt
 Auditoria 60 — Pacote de exportação final — validada
-Auditoria 61 — Manual de uso local
+Auditoria 61 — Manual de uso local — registrada
 Auditoria 62 — Checklist de validação por louvor
 Auditoria 63 — Validação profissional com repertório real inicial
 Auditoria 64 — Correções finais do cpp-pro
@@ -186,8 +186,9 @@ Auditorias 55–59 — fechado
 
 ```txt
 Auditoria 60 — validada
-Auditoria 61 — próxima
-Auditorias 62–64 — pendentes
+Auditoria 61 — registrada
+Auditoria 62 — próxima
+Auditorias 63–64 — pendentes
 ```
 
 ## Regra permanente de execução
