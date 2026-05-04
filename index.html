@@ -5,15 +5,15 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
   <meta name="theme-color" content="#111827" />
   <title>cpp_pro — Conversor Profissional de Partituras</title>
-  <link rel="manifest" href="./manifest.json?v=audit-50-cache-v1" />
-  <link rel="stylesheet" href="./src/styles.css?v=audit-50-cache-v1" />
+  <link rel="manifest" href="./manifest.json?v=audit-50-cache-v2" />
+  <link rel="stylesheet" href="./src/styles.css?v=audit-50-cache-v2" />
 </head>
 <body>
   <header class="app-header">
     <div>
       <h1>cpp_pro</h1>
       <p>Conversor Profissional de Partituras — OMR, MusicXML, Revisão e Cifra Tocável</p>
-      <p id="frontendBuild" class="build-info">Frontend build: audit-50-cache-v1</p>
+      <p id="frontendBuild" class="build-info">Frontend build: audit-50-cache-v2</p>
     </div>
   </header>
 
@@ -34,7 +34,7 @@
       </div>
 
       <div class="card">
-        <input id="fileInput" type="file" accept=".pdf,.musicxml,.xml,image/png,image/jpeg,image/webp" />
+        <input id="fileInput" type="file" accept=".pdf,.musicxml,.xml,.mxl,image/png,image/jpeg,image/webp" />
         <div id="fileInfo" class="info"></div>
         <div class="grid2">
           <label>Título <input id="musicTitle" placeholder="Título da música" /></label>
@@ -150,26 +150,48 @@
   </main>
 
   <div id="toast" class="toast hidden"></div>
-  <script type="module" src="./src/app.js?v=audit-50-cache-v1"></script>
+  <script type="module" src="./src/app.js?v=audit-50-cache-v2"></script>
   <script type="module">
-    import { loadProtocol } from "./src/modules/cpp-json.js?v=audit-50-cache-v1";
-    import { downloadText, versioned } from "./src/modules/export-output.js?v=audit-50-cache-v1";
-    import { generateMultipageAuditExportText } from "./src/modules/multipage-audit-export.js?v=audit-50-cache-v1";
-    import { appendOperationalError, exportOperationalErrorLogText } from "./src/modules/error-reporting.js?v=audit-50-cache-v1";
-    import { checkProfessionalOmrBackend } from "./src/modules/professional-omr-client.js?v=audit-50-cache-v1";
+    import { loadProtocol, saveProtocol } from "./src/modules/cpp-json.js?v=audit-50-cache-v2";
+    import { validateFile } from "./src/modules/file-input.js?v=audit-50-cache-v2";
+    import { downloadText, versioned } from "./src/modules/export-output.js?v=audit-50-cache-v2";
+    import { generateMultipageAuditExportText } from "./src/modules/multipage-audit-export.js?v=audit-50-cache-v2";
+    import { appendOperationalError, exportOperationalErrorLogText } from "./src/modules/error-reporting.js?v=audit-50-cache-v2";
+    import { analyzeWithProfessionalOmr, checkProfessionalOmrBackend } from "./src/modules/professional-omr-client.js?v=audit-50-cache-v2";
 
     const build = document.getElementById("frontendBuild");
-    if (build) build.textContent = "Frontend build: audit-50-cache-v1";
+    if (build) build.textContent = "Frontend build: audit-50-cache-v2";
 
     const errorLog = document.getElementById("frontendErrorLog");
     const backendStatus = document.getElementById("backendStatus");
+    const processingStatus = document.getElementById("processingStatus");
     const toastBox = document.getElementById("toast");
+    let audit50SelectedFile = null;
 
     function audit50Toast(message) {
       if (!toastBox) return;
       toastBox.textContent = message;
       toastBox.classList.remove("hidden");
       setTimeout(() => toastBox.classList.add("hidden"), 2600);
+    }
+
+    function fileBaseName(fileName = "") {
+      return fileName.replace(/\.[^.]+$/, "").trim();
+    }
+
+    function frontendSummary(protocol) {
+      const source = protocol.source || {};
+      const ocr = protocol.ocr || {};
+      const fusion = protocol.fusion || {};
+      return [
+        "Processamento concluído.",
+        `Arquivo: ${source.file_name || ""}`,
+        `Status OMR: ${source.omr_status || "pending"}`,
+        `Status OCR: ${source.ocr_status || ocr.status || "pending"}`,
+        `Blocos OCR: ${ocr.text_blocks?.length || 0}`,
+        `Compassos importados: ${protocol.measures?.length || 0}`,
+        `Fusion: ${fusion.status || "not_available"}`,
+      ].join("\n");
     }
 
     const originalConsoleError = console.error.bind(console);
@@ -186,6 +208,22 @@
       appendOperationalError(errorLog, event.reason || "Promise rejeitada sem tratamento", { category: "frontend_promise" });
     });
 
+    const fileInput = document.getElementById("fileInput");
+    if (fileInput) {
+      fileInput.addEventListener("change", event => {
+        audit50SelectedFile = event.target.files?.[0] || null;
+        const valid = validateFile(audit50SelectedFile);
+        const fileInfo = document.getElementById("fileInfo");
+        if (fileInfo) fileInfo.textContent = audit50SelectedFile ? `${audit50SelectedFile.name} — ${valid.message}` : "Nenhum arquivo selecionado.";
+        if (audit50SelectedFile) {
+          document.getElementById("musicTitle").value = fileBaseName(audit50SelectedFile.name);
+          document.getElementById("musicKey").value = "";
+          document.getElementById("meterDefault").value = "";
+          document.getElementById("tempo").value = "";
+        }
+      });
+    }
+
     const checkBackend = document.getElementById("btnCheckBackend");
     if (checkBackend) {
       checkBackend.addEventListener("click", async () => {
@@ -199,6 +237,62 @@
           if (backendStatus) backendStatus.textContent = `Backend indisponível.\n${error.message || error}`;
           appendOperationalError(errorLog, error, { category: "backend", operation: "health_check", backendUrl });
           audit50Toast("Backend indisponível.");
+        }
+      });
+    }
+
+    const clearCache = document.getElementById("btnClearFrontendCache");
+    if (clearCache) {
+      clearCache.addEventListener("click", async () => {
+        try {
+          audit50Toast("Limpando cache do app...");
+          if ("serviceWorker" in navigator) {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(registrations.map(reg => reg.unregister()));
+          }
+          if ("caches" in window) {
+            const keys = await caches.keys();
+            await Promise.all(keys.filter(key => key.startsWith("cpp-professional-omr-")).map(key => caches.delete(key)));
+          }
+          window.location.reload();
+        } catch (error) {
+          appendOperationalError(errorLog, error, { category: "frontend_cache", operation: "clear_cache" });
+          if (backendStatus) backendStatus.textContent = `Falha ao limpar cache.\n${error.message || error}`;
+          audit50Toast("Falha ao limpar cache.");
+        }
+      });
+    }
+
+    const processButton = document.getElementById("btnProfessionalOmr");
+    if (processButton) {
+      processButton.addEventListener("click", async () => {
+        const selected = audit50SelectedFile || document.getElementById("fileInput")?.files?.[0] || null;
+        const valid = validateFile(selected);
+        if (!valid.ok) {
+          const fileInfo = document.getElementById("fileInfo");
+          if (fileInfo) fileInfo.textContent = valid.message;
+          appendOperationalError(errorLog, new Error(valid.message), { category: "file" });
+          audit50Toast(valid.message);
+          return;
+        }
+        const backendUrl = document.getElementById("backendUrl")?.value?.trim() || "http://localhost:8787";
+        processButton.disabled = true;
+        processButton.textContent = "Processando...";
+        if (processingStatus) processingStatus.textContent = "Enviando arquivo ao backend OMR profissional...";
+        try {
+          const protocol = await analyzeWithProfessionalOmr({ file: selected, backendUrl });
+          protocol.music ||= {};
+          protocol.music.title ||= fileBaseName(selected.name) || "Sem título";
+          saveProtocol(protocol);
+          if (processingStatus) processingStatus.textContent = frontendSummary(protocol);
+          audit50Toast("Processamento profissional concluído.");
+        } catch (error) {
+          appendOperationalError(errorLog, error, { category: "backend", operation: "analyze", backendUrl, file_name: selected?.name || "" });
+          if (processingStatus) processingStatus.textContent = `Erro no processamento profissional.\n${error.message || error}`;
+          audit50Toast("Erro no OMR profissional.");
+        } finally {
+          processButton.disabled = false;
+          processButton.textContent = "Processar com OMR Profissional";
         }
       });
     }
