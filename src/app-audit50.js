@@ -1,4 +1,4 @@
-const BUILD = 'audit-58-4-cache-v1';
+const BUILD = 'audit-58-5-cache-v1';
 const STORAGE_KEY = 'cpp_professional_omr_protocol_v1';
 const $ = id => document.getElementById(id);
 
