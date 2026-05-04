@@ -4,6 +4,27 @@ Este documento registra o andamento planejado do CPP após a validação das Aud
 
 Objetivo geral: evoluir o Conversor Profissional de Partituras de um núcleo OCR/Fusion textual conservador até um fluxo profissional auditável com revisão humana, geometria, cifra técnica confiável, multipágina, robustez operacional e validação assistida.
 
+## Estado consolidado atual
+
+```txt
+Auditorias 25–44 — validadas e registradas
+Marcos 1–4 — fechados
+Última validação confirmada: 15 passed in 0.57s
+Último commit validado: 1ee599e Record audit 44 musical confidence report validation
+Branch: main
+origin/main: sincronizado
+Próxima auditoria: Auditoria 45 — OCR de PDF por conversão página→imagem
+```
+
+## Marcos fechados
+
+```txt
+Marco 1 — Núcleo OCR/Fusion textual profissional — Auditorias 25–29 — fechado
+Marco 2 — Núcleo geométrico MusicXML + OCR — Auditorias 30–34 — fechado
+Marco 3 — Núcleo de revisão humana auditável — Auditorias 35–39 — fechado
+Marco 4 — Núcleo de cifra técnica confiável — Auditorias 40–44 — fechado
+```
+
 ## Estado confirmado antes deste roadmap
 
 ```txt
@@ -28,38 +49,42 @@ Observação de execução: neste repositório, as Auditorias 25 e 26 já foram 
 ```txt
 Auditoria 25 — Classificação conservadora de text_blocks OCR — validada
 Auditoria 26 — Exposição de classification_counts no frontend e relatórios — validada
+Auditoria 26.1 — Agrupamento OCR por linha visual — validada
+Auditoria 27 — Agrupamento OCR por região funcional — validada
+Auditoria 28 — Normalização conservadora de texto OCR — validada
+Auditoria 29 — Detecção/análise estrutural de possíveis cifras sem inferência harmônica — validada
 ```
 
-O conteúdo listado acima permanece como macro-roadmap do Bloco A; a numeração operacional pode ser ajustada em registros futuros sem perder o objetivo técnico.
+O conteúdo listado acima permanece como macro-roadmap do Bloco A; a numeração operacional foi ajustada nos registros validados sem perder o objetivo técnico.
 
 ## BLOCO B — Geometria e layout musical
 
 ```txt
-Auditoria 30 — Extrair/registrar geometria de página e sistema
-Auditoria 31 — Mapear regiões OCR para sistemas musicais
-Auditoria 32 — Mapear regiões OCR para compassos aproximados
-Auditoria 33 — Calcular confiança de associação OCR→compasso
-Auditoria 34 — Relatório visual de alinhamento OCR/MusicXML
+Auditoria 30 — Extrair/registrar geometria de página e sistema — validada
+Auditoria 31 — Mapear regiões OCR para sistemas musicais — validada
+Auditoria 32 — Mapear regiões OCR para compassos aproximados — validada
+Auditoria 33 — Calcular confiança de associação OCR→compasso — validada
+Auditoria 34 — Relatório visual de alinhamento OCR/MusicXML — validada
 ```
 
 ## BLOCO C — Revisão humana profissional
 
 ```txt
-Auditoria 35 — Painel de revisão de OCR por bloco
-Auditoria 36 — Aprovar/rejeitar classificação OCR
-Auditoria 37 — Revisão de associação texto→sistema
-Auditoria 38 — Revisão de associação texto→compasso
-Auditoria 39 — Histórico de decisões humanas no protocolo
+Auditoria 35 — Painel de revisão de OCR por bloco — validada
+Auditoria 36 — Aprovar/rejeitar classificação OCR — validada
+Auditoria 37 — Revisão de associação texto→sistema — validada
+Auditoria 38 — Revisão de associação texto→compasso — validada
+Auditoria 39 — Histórico de decisões humanas no protocolo — validada
 ```
 
 ## BLOCO D — Cifra técnica confiável
 
 ```txt
-Auditoria 40 — Inserir letra aprovada na cifra técnica
-Auditoria 41 — Inserir cifras candidatas aprovadas
-Auditoria 42 — Separar cifra detectada, cifra aprovada e cifra tocável
-Auditoria 43 — Marcar lacunas por compasso
-Auditoria 44 — Gerar relatório de confiança musical
+Auditoria 40 — Inserir letra aprovada na cifra técnica — validada
+Auditoria 41 — Inserir cifras candidatas aprovadas — validada
+Auditoria 42 — Separar cifra detectada, cifra aprovada e cifra tocável — validada
+Auditoria 43 — Marcar lacunas por compasso — validada
+Auditoria 44 — Gerar relatório de confiança musical — validada
 ```
 
 ## BLOCO E — PDF e múltiplas páginas
@@ -107,31 +132,31 @@ Auditoria 64 — Correções finais do cpp-pro
 ### Marco 1 — Núcleo OCR/Fusion textual profissional
 
 ```txt
-Auditorias 25–29
+Auditorias 25–29 — fechado
 ```
 
 ### Marco 2 — Núcleo geométrico MusicXML + OCR
 
 ```txt
-Auditorias 30–34
+Auditorias 30–34 — fechado
 ```
 
 ### Marco 3 — Núcleo de revisão humana auditável
 
 ```txt
-Auditorias 35–39
+Auditorias 35–39 — fechado
 ```
 
 ### Marco 4 — Núcleo de cifra técnica confiável
 
 ```txt
-Auditorias 40–44
+Auditorias 40–44 — fechado
 ```
 
 ### Marco 5 — Núcleo PDF/multipágina/cache/custo
 
 ```txt
-Auditorias 45–49
+Auditorias 45–49 — próximo
 ```
 
 ### Marco 6 — Núcleo operacional robusto
