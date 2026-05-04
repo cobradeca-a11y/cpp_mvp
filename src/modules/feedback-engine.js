@@ -1,3 +1,5 @@
+import { musicalConfidenceReport } from "./confidence-engine.js";
+
 function pendingReason(measure) {
   const reviewStatus = measure.review_status || "pending";
   const confidence = measure.confidence || "provável";
@@ -209,5 +211,9 @@ export function detectionReport(protocol) {
     lines.push("");
     lines.push(...fusionSummary(protocol));
   }
+
+  lines.push("");
+  lines.push(musicalConfidenceReport(protocol));
+
   return lines.join("\n");
 }
