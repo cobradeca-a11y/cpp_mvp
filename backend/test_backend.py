@@ -1,5 +1,6 @@
 import io
 import zipfile
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
@@ -268,12 +269,16 @@ def test_image_google_vision_adc_failure_is_reported(monkeypatch):
     assert data["measures"] == []
 
 
-def test_pdf_google_vision_without_page_conversion_remains_unavailable(monkeypatch, tmp_path):
+def test_pdf_google_vision_without_page_conversion_dependency_is_reported(monkeypatch, tmp_path):
     monkeypatch.setattr(main, "audiveris_available", lambda: False)
     monkeypatch.setenv("OCR_ENGINE", "google_vision")
     credentials = tmp_path / "gcp.json"
     credentials.write_text("{}", encoding="utf-8")
     monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", str(credentials))
+    monkeypatch.setattr(
+        "ocr_engine.convert_pdf_to_page_images",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(ImportError("PyMuPDF/fitz não instalado")),
+    )
 
     client = TestClient(app)
     response = client.post(
@@ -286,8 +291,67 @@ def test_pdf_google_vision_without_page_conversion_remains_unavailable(monkeypat
     assert data["source"]["file_type"] == "pdf"
     assert_professional_contracts(data, "unavailable")
     assert data["ocr"]["engine"] == "google_vision"
-    assert "PDF local exige conversão" in data["ocr"]["warnings"][0]
+    assert "PDF→imagem" in data["ocr"]["warnings"][0]
+    assert data["ocr"]["text_blocks"] == []
     assert data["measures"] == []
+
+
+def test_pdf_google_vision_converts_pages_and_preserves_page_origin(monkeypatch, tmp_path):
+    monkeypatch.setattr(main, "audiveris_available", lambda: False)
+    monkeypatch.setenv("OCR_ENGINE", "google_vision")
+    credentials = tmp_path / "gcp.json"
+    credentials.write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", str(credentials))
+
+    def fake_convert(_source_path: Path, output_dir: Path):
+        page1 = output_dir / "page-0001.png"
+        page2 = output_dir / "page-0002.png"
+        page1.write_bytes(b"fake-page-1")
+        page2.write_bytes(b"fake-page-2")
+        return [(1, page1), (2, page2)]
+
+    def fake_vision(image_path: Path, *_args, **_kwargs):
+        if image_path.name == "page-0001.png":
+            return [
+                {
+                    "text": "Am",
+                    "confidence": 0.0,
+                    "bbox": {"vertices": [{"x": 1, "y": 2}, {"x": 3, "y": 2}, {"x": 3, "y": 4}, {"x": 1, "y": 4}]},
+                    "page": 1,
+                    "source": "ocr",
+                }
+            ]
+        return [
+            {
+                "text": "Glória",
+                "confidence": 0.0,
+                "bbox": {"vertices": [{"x": 10, "y": 20}, {"x": 30, "y": 20}, {"x": 30, "y": 40}, {"x": 10, "y": 40}]},
+                "page": 1,
+                "source": "ocr",
+            }
+        ]
+
+    monkeypatch.setattr("ocr_engine.convert_pdf_to_page_images", fake_convert)
+    monkeypatch.setattr("ocr_engine._run_google_vision_image", fake_vision)
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/omr/analyze",
+        files={"file": ("sample.pdf", b"%PDF-1.4\n%fake\n", "application/pdf")},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["source"]["file_type"] == "pdf"
+    assert_professional_contracts(data, "success")
+    assert data["ocr"]["engine"] == "google_vision"
+    assert [block["text"] for block in data["ocr"]["text_blocks"]] == ["Am", "Glória"]
+    assert [block["page"] for block in data["ocr"]["text_blocks"]] == [1, 2]
+    assert "PDF convertido página→imagem" in data["ocr"]["warnings"][0]
+    assert data["fusion"]["possible_chords"][0]["text"] == "Am"
+    assert data["fusion"]["possible_lyrics"][0]["text"] == "Glória"
+    assert data["ocr_system_associations"]["status"] == "blocked_no_reliable_layout_geometry"
+    assert data["ocr_measure_associations"]["status"] == "blocked_no_system_association"
 
 
 def test_image_google_vision_success_with_mocked_json_credentials(monkeypatch, tmp_path):
