@@ -126,6 +126,20 @@ def assert_ocr_measure_association_contract(data):
     assert isinstance(contract["average_confidence_score"], float)
 
 
+def assert_page_system_measure_contract(data):
+    assert "page_system_measure_associations" in data
+    contract = data["page_system_measure_associations"]
+    assert contract["engine"] == "cpp_page_system_measure_association_contract"
+    assert contract["version"] == "audit-48"
+    assert isinstance(contract["status"], str)
+    assert isinstance(contract["page_count"], int)
+    assert isinstance(contract["assigned_count"], int)
+    assert isinstance(contract["blocked_count"], int)
+    assert isinstance(contract["unassigned_count"], int)
+    assert isinstance(contract["associations"], list)
+    assert isinstance(contract["warnings"], list)
+
+
 def assert_alignment_report_contract(data):
     assert "alignment_report" in data
     report = data["alignment_report"]
@@ -147,6 +161,7 @@ def assert_professional_contracts(data, expected_ocr_status):
     assert_layout_contract(data)
     assert_ocr_system_association_contract(data)
     assert_ocr_measure_association_contract(data)
+    assert_page_system_measure_contract(data)
     assert_alignment_report_contract(data)
 
 
@@ -183,6 +198,7 @@ def test_pdf_returns_professional_protocol_when_audiveris_unavailable(monkeypatc
     assert data["ocr"]["possible_chords"] == []
     assert data["ocr"]["possible_lyrics"] == []
     assert data["ocr"]["multipage_status"] == "not_processed"
+    assert data["page_system_measure_associations"]["status"] == "no_pages_available"
     assert data["fusion"]["status"] == "no_ocr_text"
     assert data["layout"]["status"] == "no_layout_subjects"
     assert data["ocr_system_associations"]["status"] == "no_ocr_regions"
@@ -217,6 +233,8 @@ def test_musicxml_without_namespace_imports_measures():
     assert data["ocr"]["multipage_status"] == "not_processed"
     assert data["fusion"]["status"] == "no_ocr_text"
     assert data["layout"]["status"] == "geometry_unavailable"
+    assert data["page_system_measure_associations"]["status"] == "blocked_no_reliable_page_system_measure_geometry"
+    assert data["page_system_measure_associations"]["associations"][0]["association_status"] == "blocked_no_ocr_page_evidence"
     assert data["layout"]["page_count"] == 1
     assert data["layout"]["system_count"] == 1
     assert data["layout"]["pages"][0]["geometry_status"] == "unavailable_no_reliable_layout_geometry"
@@ -355,6 +373,12 @@ def test_pdf_google_vision_converts_pages_and_preserves_page_origin(monkeypatch,
     assert data["ocr"]["engine"] == "google_vision"
     assert data["ocr"]["multipage_status"] == "multipage_processed"
     assert data["ocr"]["page_count"] == 2
+    assert data["page_system_measure_associations"]["page_count"] == 2
+    assert data["page_system_measure_associations"]["blocked_count"] == 2
+    assert all(
+        item["association_status"] == "blocked_no_reliable_system_geometry"
+        for item in data["page_system_measure_associations"]["associations"]
+    )
     assert data["ocr"]["pages"] == [
         {"page": 1, "ocr_status": "success", "text_block_count": 1},
         {"page": 2, "ocr_status": "success", "text_block_count": 1},
