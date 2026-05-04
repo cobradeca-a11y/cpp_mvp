@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -8,6 +9,7 @@ OCR_SUPPORTED_FILE_TYPES = {"pdf", "png", "jpg", "jpeg", "webp"}
 OCR_IMAGE_FILE_TYPES = {"png", "jpg", "jpeg", "webp"}
 OCR_NOT_APPLICABLE_FILE_TYPES = {"xml", "musicxml", "mxl"}
 GOOGLE_VISION_ENGINE = "google_vision"
+PDF_CONVERSION_DPI = 220
 
 
 def configured_ocr_engine_cmd() -> str:
@@ -30,12 +32,9 @@ def create_empty_ocr_contract(status: str = "pending", engine: str = "") -> dict
 def build_ocr_contract(source_path: str | Path | None = None, source_name: str = "", file_type: str = "") -> dict[str, Any]:
     """Return an explicit OCR evidence contract without faking OCR results.
 
-    Audit 22.1 supports Google Vision through either:
-    - GOOGLE_APPLICATION_CREDENTIALS JSON when available; or
-    - Application Default Credentials from `gcloud auth application-default login`.
-
-    It must not merge OCR with MusicXML or mutate measures, meter, key,
-    notes, rests, navigation or review state.
+    Audit 45 supports local PDF OCR by converting each PDF page to an image
+    before running Google Vision. Page origin must be preserved in every text
+    block. If conversion or OCR fails, no text is invented.
     """
     normalized_type = normalize_file_type(file_type or suffix_to_file_type(source_name))
 
@@ -61,11 +60,7 @@ def build_ocr_contract(source_path: str | Path | None = None, source_name: str =
         return contract
 
     if normalized_type == "pdf":
-        contract = create_empty_ocr_contract(status="unavailable", engine=GOOGLE_VISION_ENGINE)
-        contract["warnings"].append(
-            "Google Vision OCR para PDF local exige conversão página→imagem ou fluxo GCS; ainda não executado nesta auditoria."
-        )
-        return contract
+        return run_google_vision_pdf_ocr(Path(source_path) if source_path else None)
 
     if normalized_type in OCR_IMAGE_FILE_TYPES:
         return run_google_vision_image_ocr(Path(source_path) if source_path else None)
@@ -76,12 +71,9 @@ def build_ocr_contract(source_path: str | Path | None = None, source_name: str =
 
 
 def run_google_vision_image_ocr(source_path: Path | None) -> dict[str, Any]:
-    credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "").strip().strip('"')
-
-    if credentials_path and not Path(credentials_path).exists():
-        contract = create_empty_ocr_contract(status="unavailable", engine=GOOGLE_VISION_ENGINE)
-        contract["warnings"].append(f"Arquivo de credenciais Google não encontrado: {credentials_path}")
-        return contract
+    credentials_error = validate_google_credentials()
+    if credentials_error:
+        return credentials_error
 
     if source_path is None or not source_path.exists():
         contract = create_empty_ocr_contract(status="failed", engine=GOOGLE_VISION_ENGINE)
@@ -104,12 +96,104 @@ def run_google_vision_image_ocr(source_path: Path | None) -> dict[str, Any]:
         return contract
 
     contract = create_empty_ocr_contract(status="success", engine=GOOGLE_VISION_ENGINE)
-    contract["text_blocks"] = text_blocks
+    contract["text_blocks"] = normalize_ocr_pages(text_blocks, default_page=1)
     if not text_blocks:
         contract["warnings"].append("Google Vision executou, mas não retornou blocos de texto.")
-    if not credentials_path:
+    if not os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "").strip().strip('"'):
         contract["warnings"].append("Google Vision executado via Application Default Credentials local.")
     return contract
+
+
+def run_google_vision_pdf_ocr(source_path: Path | None) -> dict[str, Any]:
+    credentials_error = validate_google_credentials()
+    if credentials_error:
+        return credentials_error
+
+    if source_path is None or not source_path.exists():
+        contract = create_empty_ocr_contract(status="failed", engine=GOOGLE_VISION_ENGINE)
+        contract["warnings"].append("Arquivo PDF de entrada OCR não encontrado.")
+        return contract
+
+    try:
+        with tempfile.TemporaryDirectory(prefix="cpp_pdf_pages_") as tmp:
+            page_images = convert_pdf_to_page_images(source_path, Path(tmp))
+            if not page_images:
+                contract = create_empty_ocr_contract(status="failed", engine=GOOGLE_VISION_ENGINE)
+                contract["warnings"].append("Conversão PDF→imagem não retornou páginas para OCR.")
+                return contract
+
+            all_blocks: list[dict[str, Any]] = []
+            warnings: list[str] = []
+            for page_number, image_path in page_images:
+                try:
+                    page_blocks = _run_google_vision_image(image_path, configured_ocr_feature())
+                    all_blocks.extend(normalize_ocr_pages(page_blocks, default_page=page_number))
+                except Exception as exc:  # pragma: no cover - external API/runtime path
+                    warnings.append(f"Falha no OCR da página {page_number}: {exc}")
+    except ImportError as exc:
+        contract = create_empty_ocr_contract(status="unavailable", engine=GOOGLE_VISION_ENGINE)
+        contract["warnings"].append(f"Dependência de conversão PDF→imagem indisponível: {exc}")
+        return contract
+    except Exception as exc:
+        contract = create_empty_ocr_contract(status="failed", engine=GOOGLE_VISION_ENGINE)
+        contract["warnings"].append(f"Falha ao converter PDF→imagem para OCR: {exc}")
+        return contract
+
+    contract = create_empty_ocr_contract(status="success" if all_blocks else "failed", engine=GOOGLE_VISION_ENGINE)
+    contract["text_blocks"] = all_blocks
+    contract["warnings"].append("PDF convertido página→imagem para OCR local. Origem de página preservada em cada bloco OCR.")
+    contract["warnings"].extend(warnings)
+    if not all_blocks:
+        contract["warnings"].append("Google Vision executou nas páginas convertidas, mas não retornou blocos de texto.")
+    if not os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "").strip().strip('"'):
+        contract["warnings"].append("Google Vision executado via Application Default Credentials local.")
+    return contract
+
+
+def validate_google_credentials() -> dict[str, Any] | None:
+    credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "").strip().strip('"')
+    if credentials_path and not Path(credentials_path).exists():
+        contract = create_empty_ocr_contract(status="unavailable", engine=GOOGLE_VISION_ENGINE)
+        contract["warnings"].append(f"Arquivo de credenciais Google não encontrado: {credentials_path}")
+        return contract
+    return None
+
+
+def convert_pdf_to_page_images(source_path: Path, output_dir: Path) -> list[tuple[int, Path]]:
+    """Convert PDF pages to PNG images using PyMuPDF when available.
+
+    The function returns `(page_number, image_path)` pairs with 1-based page
+    numbers. It is intentionally isolated so tests can monkeypatch it without
+    requiring a real PDF renderer.
+    """
+    try:
+        import fitz  # type: ignore
+    except ImportError as exc:  # pragma: no cover - dependency availability path
+        raise ImportError("PyMuPDF/fitz não instalado. Instale PyMuPDF para OCR local de PDF.") from exc
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    document = fitz.open(str(source_path))
+    page_images: list[tuple[int, Path]] = []
+    try:
+        for page_index in range(len(document)):
+            page = document.load_page(page_index)
+            pix = page.get_pixmap(dpi=PDF_CONVERSION_DPI, alpha=False)
+            image_path = output_dir / f"page-{page_index + 1:04d}.png"
+            pix.save(str(image_path))
+            page_images.append((page_index + 1, image_path))
+    finally:
+        document.close()
+    return page_images
+
+
+def normalize_ocr_pages(text_blocks: list[dict[str, Any]], default_page: int) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for block in text_blocks:
+        copied = dict(block)
+        copied["page"] = int(copied.get("page") or default_page)
+        copied.setdefault("source", "ocr")
+        out.append(copied)
+    return out
 
 
 def _run_google_vision_image(source_path: Path, feature: str) -> list[dict[str, Any]]:
