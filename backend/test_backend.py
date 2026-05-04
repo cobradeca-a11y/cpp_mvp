@@ -299,6 +299,7 @@ def test_pdf_google_vision_without_page_conversion_dependency_is_reported(monkey
 def test_pdf_google_vision_converts_pages_and_preserves_page_origin(monkeypatch, tmp_path):
     monkeypatch.setattr(main, "audiveris_available", lambda: False)
     monkeypatch.setenv("OCR_ENGINE", "google_vision")
+    monkeypatch.setenv("CPP_OCR_CACHE_DIR", str(tmp_path / "cache_pdf_basic"))
     credentials = tmp_path / "gcp.json"
     credentials.write_text("{}", encoding="utf-8")
     monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", str(credentials))
@@ -354,9 +355,92 @@ def test_pdf_google_vision_converts_pages_and_preserves_page_origin(monkeypatch,
     assert data["ocr_measure_associations"]["status"] == "blocked_no_system_association"
 
 
+def test_pdf_google_vision_uses_page_cache_without_repeating_ocr(monkeypatch, tmp_path):
+    monkeypatch.setattr(main, "audiveris_available", lambda: False)
+    monkeypatch.setenv("OCR_ENGINE", "google_vision")
+    monkeypatch.setenv("CPP_OCR_CACHE_DIR", str(tmp_path / "cache_pdf"))
+    credentials = tmp_path / "gcp.json"
+    credentials.write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", str(credentials))
+    calls = {"vision": 0}
+
+    def fake_convert(_source_path: Path, output_dir: Path):
+        page1 = output_dir / "page-0001.png"
+        page1.write_bytes(b"same-page-content")
+        return [(1, page1)]
+
+    def fake_vision(_image_path: Path, *_args, **_kwargs):
+        calls["vision"] += 1
+        return [
+            {
+                "text": "Am",
+                "confidence": 0.0,
+                "bbox": {"vertices": [{"x": 1, "y": 2}, {"x": 3, "y": 2}, {"x": 3, "y": 4}, {"x": 1, "y": 4}]},
+                "page": 1,
+                "source": "ocr",
+            }
+        ]
+
+    monkeypatch.setattr("ocr_engine.convert_pdf_to_page_images", fake_convert)
+    monkeypatch.setattr("ocr_engine._run_google_vision_image", fake_vision)
+
+    client = TestClient(app)
+    for _ in range(2):
+        response = client.post(
+            "/api/omr/analyze",
+            files={"file": ("sample.pdf", b"%PDF-1.4\n%fake\n", "application/pdf")},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert_professional_contracts(data, "success")
+        assert data["ocr"]["text_blocks"][0]["page"] == 1
+
+    assert calls["vision"] == 1
+    assert "Cache OCR audit-46: 1 hit(s), 0 miss(es)." in data["ocr"]["warnings"]
+
+
+def test_image_google_vision_uses_cache_without_repeating_ocr(monkeypatch, tmp_path):
+    monkeypatch.setattr(main, "audiveris_available", lambda: False)
+    monkeypatch.setenv("OCR_ENGINE", "google_vision")
+    monkeypatch.setenv("CPP_OCR_CACHE_DIR", str(tmp_path / "cache_img"))
+    credentials = tmp_path / "gcp.json"
+    credentials.write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", str(credentials))
+    calls = {"vision": 0}
+
+    def fake_vision(_image_path: Path, *_args, **_kwargs):
+        calls["vision"] += 1
+        return [
+            {
+                "text": "Glória",
+                "confidence": 0.0,
+                "bbox": {"vertices": [{"x": 5, "y": 6}, {"x": 7, "y": 6}, {"x": 7, "y": 8}, {"x": 5, "y": 8}]},
+                "page": 1,
+                "source": "ocr",
+            }
+        ]
+
+    monkeypatch.setattr("ocr_engine._run_google_vision_image", fake_vision)
+
+    client = TestClient(app)
+    for _ in range(2):
+        response = client.post(
+            "/api/omr/analyze",
+            files={"file": ("sample.png", b"\x89PNG\r\n\x1a\nfake", "image/png")},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert_professional_contracts(data, "success")
+        assert data["ocr"]["text_blocks"][0]["text"] == "Glória"
+
+    assert calls["vision"] == 1
+    assert "OCR carregado do cache audit-46 por hash de imagem." in data["ocr"]["warnings"]
+
+
 def test_image_google_vision_success_with_mocked_json_credentials(monkeypatch, tmp_path):
     monkeypatch.setattr(main, "audiveris_available", lambda: False)
     monkeypatch.setenv("OCR_ENGINE", "google_vision")
+    monkeypatch.setenv("CPP_OCR_CACHE_DIR", str(tmp_path / "cache_img_basic"))
     monkeypatch.setenv("OCR_FEATURE", "DOCUMENT_TEXT_DETECTION")
     credentials = tmp_path / "gcp.json"
     credentials.write_text("{}", encoding="utf-8")
@@ -436,9 +520,10 @@ def test_image_google_vision_success_with_mocked_json_credentials(monkeypatch, t
     assert any(blocker["code"] == "ocr_measure_association_blocked" for blocker in data["alignment_report"]["blockers"])
 
 
-def test_image_google_vision_success_with_mocked_adc(monkeypatch):
+def test_image_google_vision_success_with_mocked_adc(monkeypatch, tmp_path):
     monkeypatch.setattr(main, "audiveris_available", lambda: False)
     monkeypatch.setenv("OCR_ENGINE", "google_vision")
+    monkeypatch.setenv("CPP_OCR_CACHE_DIR", str(tmp_path / "cache_adc"))
     monkeypatch.delenv("GOOGLE_APPLICATION_CREDENTIALS", raising=False)
     monkeypatch.setattr(
         "ocr_engine._run_google_vision_image",
