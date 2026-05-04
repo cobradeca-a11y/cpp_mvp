@@ -141,5 +141,22 @@
 
   <div id="toast" class="toast hidden"></div>
   <script type="module" src="./src/app.js?v=audit-49-cache-v1"></script>
+  <script type="module">
+    import { loadProtocol } from "./src/modules/cpp-json.js?v=audit-49-cache-v1";
+    import { downloadText, versioned } from "./src/modules/export-output.js?v=audit-49-cache-v1";
+    import { generateMultipageAuditExportText } from "./src/modules/multipage-audit-export.js?v=audit-49-cache-v1";
+
+    const build = document.getElementById("frontendBuild");
+    if (build) build.textContent = "Frontend build: audit-49-cache-v1";
+
+    const button = document.getElementById("btnExportMultipageAudit");
+    if (button) {
+      button.addEventListener("click", () => {
+        const protocol = loadProtocol();
+        const text = generateMultipageAuditExportText(protocol);
+        downloadText(versioned("exportacao_multipagina_auditavel", "json"), text, "application/json;charset=utf-8");
+      });
+    }
+  </script>
 </body>
 </html>
