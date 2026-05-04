@@ -1,1 +1,155 @@
+Auditoria 1 — estrutura e inconsistências iniciais
 
+Resultado: correções aplicadas.
+
+Foi corrigido:
+
+- cpp-json.js passou para STORAGE_KEY profissional;
+- cpp_version passou para professional-omr-1.0;
+- ui_state/undo_stack saíram do protocolo base;
+- service-worker incluiu navigation-engine.js;
+- feedback-engine passou a usar linguagem de evidências profissionais;
+- chord-sheet-playable foi travado como saída provisória;
+- backend/main.py passou a normalizar protocolo profissional também quando Audiveris não está disponível;
+- estrutura_cpp_profissional_atualizada.txt passou a registrar navigation-engine e status provisório da cifra tocável.
+
+Auditoria 2 — backend coerente sem Audiveris instalado
+
+Resultado: correções aplicadas.
+
+Foi corrigido:
+
+- musicxml_parser.py passou a retornar protocolo profissional completo;
+- parser removeu system_analysis legado;
+- parser passou a incluir ocr_status, ocr_engine, validation_status e validation;
+- parser passou a registrar falhas de parsing como issue estruturada;
+- test_backend.py passou a testar PDF sem Audiveris;
+- teste valida omr_status unavailable, ocr_status pending, validation_status pending, outputs e navigation.status needs_review.
+
+Auditoria 3 — frontend chama apenas o fluxo profissional
+
+Resultado: aprovado em auditoria estática.
+
+Constatado:
+
+- app.js importa apenas módulos compatíveis com o fluxo profissional;
+- app.js chama analyzeWithProfessionalOmr e checkProfessionalOmrBackend;
+- não há importação dos módulos antigos measure-generator, system-analyzer, pdf-renderer, page-viewer, system-marker ou preprocessing;
+- buscas por termos antigos/heurísticos não retornaram ocorrências relevantes no repositório atual;
+- a saída tocável permanece provisória e explicitamente marcada como tal.
+
+Auditoria 4 — testes reais do backend
+
+Resultado: aprovado em terminal/CMD.
+
+Validação executada:
+
+- ambiente Python virtual criado localmente;
+- dependências instaladas via requirements.txt;
+- pytest executado no backend;
+- resultado informado: 2 passed.
+
+Conclusão:
+
+- teste do endpoint /health aprovado;
+- teste de PDF sem Audiveris aprovado;
+- backend retorna protocolo profissional controlado mesmo quando Audiveris não está disponível.
+
+Auditoria 5 — backend sobe sem quebrar
+
+Resultado: aprovado em execução real.
+
+Validação executada:
+
+- backend iniciado com uvicorn em localhost:8787;
+- endpoint http://localhost:8787/health aberto no navegador;
+- resposta recebida:
+
+{"ok":true,"app":"CPP Professional OMR Backend","audiveris_cmd":"audiveris","audiveris_available":false}
+
+Conclusão:
+
+- backend está vivo;
+- FastAPI respondeu corretamente;
+- configuração AUDIVERIS_CMD está legível;
+- Audiveris ainda não está configurado no ambiente local, o que é esperado nesta fase.
+
+Auditoria 6 — frontend abre sem erro
+
+Resultado: aprovado em execução real.
+
+Validação executada:
+
+- frontend servido localmente em http://localhost:8080;
+- tela principal abriu no navegador;
+- cabeçalho exibiu cpp_pro;
+- campo Backend OMR carregou http://localhost:8787;
+- fluxo visual principal carregou sem quebra aparente.
+
+Conclusão:
+
+- frontend local está servindo;
+- index.html, CSS e app.js carregaram de forma funcional;
+- interface principal está acessível para teste manual.
+
+Auditoria 7 — botão Verificar backend funciona
+
+Resultado: aprovado em execução real.
+
+Validação executada:
+
+- botão Verificar backend acionado no frontend local;
+- frontend consultou o backend em http://localhost:8787;
+- resposta exibida na interface:
+
+{
+  "ok": true,
+  "app": "CPP Professional OMR Backend",
+  "audiveris_cmd": "audiveris",
+  "audiveris_available": false
+}
+
+Conclusão:
+
+- frontend está comunicando com backend;
+- fluxo básico navegador → FastAPI está funcional;
+- ausência do Audiveris está corretamente sinalizada e não quebra o sistema.
+
+Auditoria 8 — upload MusicXML/MXL direto
+
+Resultado: aprovado para entrada estrutural nativa.
+
+Validação inicial:
+
+- arquivo BeetAnGeSample.musicxml foi enviado pelo frontend;
+- backend aceitou o arquivo;
+- processamento retornou Motor: Audiveris/MusicXML;
+- status retornou musicxml_parsed;
+- primeira execução retornou Compassos importados: 0.
+
+Diagnóstico da falha inicial:
+
+- o arquivo MusicXML enviado estava em formato sem namespace XML;
+- o parser anterior buscava elementos usando namespace MusicXML fixo;
+- por isso o arquivo era lido, mas <part> e <measure> não eram encontrados.
+
+Correções aplicadas:
+
+- musicxml_parser.py foi reescrito para buscar elementos por local-name, funcionando com MusicXML com namespace e sem namespace;
+- suporte real a .mxl compactado foi adicionado com leitura de META-INF/container.xml;
+- parser passou a ignorar nós XML não-elemento, como comentários;
+- main.py passou a preservar file_type correto para musicxml e mxl;
+- test_backend.py recebeu testes de regressão para MusicXML sem namespace, MXL compactado e comentários XML.
+
+Validação após correções:
+
+- BeetAnGeSample.musicxml importou 15 compassos;
+- BeetAnGeSample.mxl apresentou o mesmo resultado;
+- compasso 1 exibiu 3/4, texto/letra registrado, notas importadas e pausas importadas;
+- frontend listou compassos importados para revisão.
+
+Conclusão:
+
+- entrada .musicxml está funcional;
+- entrada .mxl está funcional;
+- parser estrutural nativo está apto para próximos testes com amostras reais adicionais.
