@@ -7,15 +7,16 @@ Objetivo geral: evoluir o Conversor Profissional de Partituras de um núcleo OCR
 ## Estado consolidado atual
 
 ```txt
-Auditorias 25–58.3 — validadas e registradas
+Auditorias 25–58.4 — validadas e registradas
 Marcos 1–6 — fechados
 Marco 7 — iniciado
 Última validação confirmada: 18 passed
-Último commit validado: 3fe6fed Record audit 58.3 measure bbox derivation validation
-Frontend build atual: audit-58-3-cache-v1
+Último commit validado: dad45d4 Record audit 58.4 manual barline validation
+Frontend build atual: audit-58-4-cache-v1
+Service worker cache atual: audit-58-4-cache-v2
 Branch: main
 origin/main: sincronizado
-Próxima auditoria: Auditoria 58.3.1 — Extração/derivação de bbox de página e sistema
+Próxima auditoria: Auditoria 58.5 — Revisão dedicada de cifras/letras/lacunas por compasso
 ```
 
 ## Marcos fechados
@@ -121,8 +122,7 @@ Auditoria 58 — Score final de confiança por compasso — validada
 Auditoria 58.1 — Gate de revisão e integridade geométrica — implementada e validada localmente
 Auditoria 58.2 — Geometria explícita por compasso — validada
 Auditoria 58.3 — Detecção/derivação real de bbox por compasso — validada
-Auditoria 58.3.1 — Extração/derivação de bbox de página e sistema
-Auditoria 58.4 — Recorte visual do compasso para revisão humana
+Auditoria 58.4 — Ajuste manual rápido de barras/compassos — validada
 Auditoria 58.5 — Revisão dedicada de cifras/letras/lacunas por compasso
 Auditoria 59 — Modo “pronto para cifra tocável”
 ```
@@ -178,9 +178,9 @@ Auditorias 50–54 — fechado
 ### Marco 7 — Núcleo de validação musical assistida
 
 ```txt
-Auditorias 55–58.3 — validadas
-Auditoria 58.3.1 — próxima
-Auditorias 58.4–59 — pendentes
+Auditorias 55–58.4 — validadas
+Auditoria 58.5 — próxima
+Auditoria 59 — pendente
 ```
 
 ### Marco 8 — Consolidação profissional com repertório real
