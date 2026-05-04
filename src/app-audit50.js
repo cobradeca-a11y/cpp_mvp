@@ -2,9 +2,8 @@ const BUILD = 'audit-59-cache-v1';
 const STORAGE_KEY = 'cpp_professional_omr_protocol_v1';
 const $ = id => document.getElementById(id);
 
-let mods = {};
-let protocol = fallbackLoadProtocol();
 let selectedFile = null;
+let protocol = loadProtocol();
 let measureIndex = 0;
 let ocrIndex = 0;
 let reviewIndex = 0;
@@ -12,34 +11,45 @@ let reviewIndex = 0;
 function emptyProtocol() {
   return {
     cpp_version: 'professional-omr-1.0',
-    source: { file_name: '', file_type: '', omr_status: 'pending', ocr_status: 'pending', ocr_engine: '', validation_status: 'pending' },
+    source: { file_name: '', file_type: '', omr_status: 'pending', ocr_status: 'pending', validation_status: 'pending' },
     music: { title: '', key: '', meter_default: '', tempo: '', composer: '', arranger: '' },
-    pages: [], systems: [], measures: [], review: [],
-    outputs: { technical_chord_sheet: '', playable_chord_sheet: '', uncertainty_report: '', detection_report: '' },
+    pages: [],
+    systems: [],
+    measures: [],
+    review: [],
+    outputs: { technical_chord_sheet: '', playable_chord_sheet: '', uncertainty_report: '', detection_report: '' }
   };
 }
 
-function sanitizeLegacyProtocol(value) {
-  const merged = { ...emptyProtocol(), ...(value || {}) };
-  merged.source = { ...emptyProtocol().source, ...(value?.source || {}) };
-  merged.music = { ...emptyProtocol().music, ...(value?.music || {}) };
-  const hasLoadedFile = Boolean(merged.source?.file_name) || (Array.isArray(merged.measures) && merged.measures.length > 0);
-  if (!hasLoadedFile && merged.music?.meter_default === '3/4') merged.music.meter_default = '';
+function sanitizeProtocol(value) {
+  const base = emptyProtocol();
+  const merged = { ...base, ...(value || {}) };
+  merged.source = { ...base.source, ...(value?.source || {}) };
+  merged.music = { ...base.music, ...(value?.music || {}) };
+  merged.outputs = { ...base.outputs, ...(value?.outputs || {}) };
+  merged.pages = Array.isArray(merged.pages) ? merged.pages : [];
+  merged.systems = Array.isArray(merged.systems) ? merged.systems : [];
+  merged.measures = Array.isArray(merged.measures) ? merged.measures : [];
+  merged.review = Array.isArray(merged.review) ? merged.review : [];
+  const hasLoadedFile = Boolean(merged.source.file_name) || merged.measures.length > 0;
+  if (!hasLoadedFile && merged.music.meter_default === '3/4') merged.music.meter_default = '';
   return merged;
 }
 
-function fallbackLoadProtocol() {
+function loadProtocol() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? sanitizeLegacyProtocol(JSON.parse(raw)) : emptyProtocol();
+    return raw ? sanitizeProtocol(JSON.parse(raw)) : emptyProtocol();
   } catch {
     return emptyProtocol();
   }
 }
 
-function fallbackSaveProtocol(value) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitizeLegacyProtocol(value || emptyProtocol())));
-}\n
+function saveProtocol(value = protocol) {
+  protocol = sanitizeProtocol(value);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(protocol));
+}
+
 function esc(value) {
   return String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
 }
@@ -57,29 +67,19 @@ function toast(message) {
   setTimeout(() => box.classList.add('hidden'), 2400);
 }
 
-function classifyError(error, context = {}) {
-  const message = String(error?.message || error || 'Erro desconhecido.');
-  return [
-    '[Erro operacional]',
-    `Código: ${context.category || 'frontend_error'}`,
-    `Mensagem: ${message}`,
-    `Contexto: ${JSON.stringify(sanitizeContext(context), null, 2)}`,
-    `Data: ${new Date().toISOString()}`,
-  ].join('\n');
-}
-
-function sanitizeContext(context = {}) {
-  const out = { ...context };
-  delete out.credentials; delete out.token; delete out.password; delete out.rawProtocol; delete out.fileContent;
-  return out;
-}
-
 function logError(error, context = {}) {
   const box = $('frontendErrorLog');
   if (!box) return;
+  const msg = String(error?.message || error || 'Erro desconhecido.');
+  const entry = [
+    '[Erro operacional]',
+    `Código: ${context.category || 'frontend_error'}`,
+    `Mensagem: ${msg}`,
+    `Contexto: ${JSON.stringify(context, null, 2)}`,
+    `Data: ${new Date().toISOString()}`
+  ].join('\n');
   const previous = box.textContent?.trim();
-  const text = classifyError(error, context);
-  box.textContent = previous && previous !== 'Nenhum erro operacional registrado nesta sessão.' ? `${text}\n\n---\n\n${previous}` : text;
+  box.textContent = previous && previous !== 'Nenhum erro operacional registrado nesta sessão.' ? `${entry}\n\n---\n\n${previous}` : entry;
 }
 
 function bindSafe(id, handler) {
@@ -87,20 +87,12 @@ function bindSafe(id, handler) {
   if (!el) return;
   el.onclick = async event => {
     event?.preventDefault?.();
-    try {
-      await handler(event);
-    } catch (error) {
-      logError(error, { category: 'button_error', button_id: id });
-      toast('Erro operacional no botão.');
-    }
+    try { await handler(event); }
+    catch (error) { logError(error, { category: 'button_error', button_id: id }); toast('Erro operacional no botão.'); }
   };
 }
 
-function fileBaseName(name = '') {
-  return String(name).replace(/\.[^.]+$/, '').trim();
-}
-
-function fallbackGetKind(file) {
+function fileKind(file) {
   if (!file) return '';
   const name = file.name.toLowerCase();
   if (file.type === 'application/pdf' || name.endsWith('.pdf')) return 'pdf';
@@ -109,42 +101,13 @@ function fallbackGetKind(file) {
   return 'unknown';
 }
 
-function validateSelectedFile(file) {
-  if (mods.validateFile) return mods.validateFile(file);
-  const kind = fallbackGetKind(file);
-  if (!file) return { ok: false, message: 'Nenhum arquivo selecionado.' };
-  if (!['pdf', 'image', 'musicxml'].includes(kind)) return { ok: false, message: 'Tipo não aceito. Use PDF, JPG, PNG, WEBP, MusicXML, XML ou MXL.' };
-  return { ok: true, kind, message: 'Arquivo aceito para OMR profissional.' };
+function fileBaseName(name = '') {
+  return String(name).replace(/\.[^.]+$/, '').trim();
 }
 
-function saveProtocolSafe() {
-  try {
-    if (mods.saveProtocol) mods.saveProtocol(sanitizeLegacyProtocol(protocol));
-    else fallbackSaveProtocol(protocol);
-  } catch (error) {
-    logError(error, { category: 'storage_error', operation: 'saveProtocol' });
-    fallbackSaveProtocol(protocol);
-  }
-}
-
-function loadProtocolSafe() {
-  try {
-    protocol = mods.loadProtocol ? sanitizeLegacyProtocol(mods.loadProtocol()) : fallbackLoadProtocol();
-  } catch (error) {
-    logError(error, { category: 'storage_error', operation: 'loadProtocol' });
-    protocol = fallbackLoadProtocol();
-  }
-}
-
-function measures() { return Array.isArray(protocol?.measures) ? protocol.measures : []; }
+function measures() { return Array.isArray(protocol.measures) ? protocol.measures : []; }
 function blocks() { return Array.isArray(protocol?.fusion?.text_blocks_index) ? protocol.fusion.text_blocks_index : []; }
-function reviews() { return Array.isArray(protocol?.review) ? protocol.review : []; }
-
-function measureText(measure) {
-  if (mods.measureFeedback) return mods.measureFeedback(measure);
-  if (!measure) return 'Nenhum compasso importado.';
-  return [`[Compasso ${measure.number || ''}]`, `Status: ${measure.confidence || 'provável'}`, `Revisão: ${measure.review_status || 'pending'}`, `Compasso: ${measure.meter || ''}`].join('\n');
-}
+function reviews() { return Array.isArray(protocol.review) ? protocol.review : []; }
 
 function renderMeasures() {
   const list = $('measuresList');
@@ -152,20 +115,17 @@ function renderMeasures() {
   if (!list || !detail) return;
   const data = measures();
   list.innerHTML = '';
-  if (!data.length) {
-    measureIndex = 0;
-    detail.textContent = 'Nenhum compasso carregado.';
-    return;
-  }
+  if (!data.length) { detail.textContent = 'Nenhum compasso carregado.'; return; }
   measureIndex = Math.min(Math.max(measureIndex, 0), data.length - 1);
   data.forEach((measure, index) => {
     const item = document.createElement('div');
     item.className = `item ${index === measureIndex ? 'active' : ''}`;
-    item.innerHTML = `<div class="row"><b>Compasso ${esc(measure.number || index + 1)}</b><span>${esc(measure.confidence || 'provável')}</span></div><small>${esc(measure.meter || '')} — ${esc(measure.review_status || 'pending')}</small>`;
+    item.innerHTML = `<div class="row"><b>Compasso ${esc(measure.number || measure.measure_number || index + 1)}</b><span>${esc(measure.confidence || 'provável')}</span></div><small>${esc(measure.review_status || 'pending')}</small>`;
     item.onclick = () => { measureIndex = index; renderMeasures(); };
     list.appendChild(item);
   });
-  detail.textContent = measureText(data[measureIndex]);
+  const m = data[measureIndex];
+  detail.textContent = JSON.stringify({ measure_id: m.measure_id || m.id || null, number: m.number || m.measure_number || measureIndex + 1, review_status: m.review_status || 'pending', geometry: m.geometry || null, playable_release: m.playable_release || null }, null, 2);
 }
 
 function renderBlocks() {
@@ -174,21 +134,16 @@ function renderBlocks() {
   if (!list || !detail) return;
   const data = blocks();
   list.innerHTML = '';
-  if (!data.length) {
-    ocrIndex = 0;
-    detail.textContent = 'Nenhum bloco OCR carregado.';
-    return;
-  }
+  if (!data.length) { detail.textContent = 'Nenhum bloco OCR carregado.'; return; }
   ocrIndex = Math.min(Math.max(ocrIndex, 0), data.length - 1);
   data.forEach((block, index) => {
     const item = document.createElement('div');
     item.className = `item ${index === ocrIndex ? 'active' : ''}`;
-    item.innerHTML = `<div class="row"><b>${esc(block.text || '[vazio]')}</b><span>${esc(block.classification || '—')}</span></div><small>${esc(block.fusion_id || '')} — ${esc(block.human_review?.status || 'pendente')}</small>`;
+    item.innerHTML = `<div class="row"><b>${esc(block.text || block.raw_text || '[vazio]')}</b><span>${esc(block.classification || '—')}</span></div><small>${esc(block.fusion_id || block.id || '')}</small>`;
     item.onclick = () => { ocrIndex = index; renderBlocks(); };
     list.appendChild(item);
   });
-  const block = data[ocrIndex];
-  detail.innerHTML = `<div class="ocr-detail-grid"><div><span class="detail-label">ID</span><strong>${esc(block.fusion_id || '—')}</strong></div><div><span class="detail-label">Página</span><strong>${esc(block.page || '—')}</strong></div><div><span class="detail-label">Classificação</span><strong>${esc(block.classification || '—')}</strong></div><div><span class="detail-label">Revisão</span><strong>${esc(block.human_review?.status || 'pendente')}</strong></div></div><h4>Texto OCR bruto preservado</h4><pre class="ocr-raw">${esc(block.text || '')}</pre><h4>Texto normalizado conservador</h4><pre class="ocr-normalized">${esc(block.normalized_text || '')}</pre><h4>Análise de cifra candidata</h4><pre class="inline-json">${esc(JSON.stringify(block.chord_analysis || null, null, 2))}</pre>`;
+  detail.innerHTML = `<pre class="inline-json">${esc(JSON.stringify(data[ocrIndex], null, 2))}</pre>`;
 }
 
 function renderReviews() {
@@ -197,11 +152,7 @@ function renderReviews() {
   if (!list || !detail) return;
   const data = reviews();
   list.innerHTML = '';
-  if (!data.length) {
-    reviewIndex = 0;
-    detail.textContent = 'Nenhuma decisão humana registrada.';
-    return;
-  }
+  if (!data.length) { detail.textContent = 'Nenhuma decisão humana registrada.'; return; }
   reviewIndex = Math.min(Math.max(reviewIndex, 0), data.length - 1);
   data.forEach((review, index) => {
     const item = document.createElement('div');
@@ -213,34 +164,27 @@ function renderReviews() {
   detail.innerHTML = `<pre class="inline-json">${esc(JSON.stringify(data[reviewIndex], null, 2))}</pre>`;
 }
 
-function technicalSheet() { return mods.generateTechnicalChordSheet ? mods.generateTechnicalChordSheet(protocol) : 'Cifra técnica indisponível: módulo não carregado.'; }
-function playableSheet() { return mods.generatePlayableChordSheet ? mods.generatePlayableChordSheet(protocol) : 'Cifra tocável indisponível: módulo não carregado.'; }
-function uncertaintyReport() { return mods.globalUncertaintyReport ? mods.globalUncertaintyReport(protocol) : 'Relatório de incertezas indisponível: módulo não carregado.'; }
-function detectReport() { return mods.detectionReport ? mods.detectionReport(protocol) : 'Relatório de detecção indisponível: módulo não carregado.'; }
-function multipageReport() { return mods.generateMultipageAuditExportText ? mods.generateMultipageAuditExportText(protocol) : JSON.stringify({ export_type: 'cpp_multipage_audit_export', version: 'audit-50-fallback', protocol }, null, 2); }
-
-function generateOutputsSafe() {
+function generateOutputs() {
   protocol.outputs ||= {};
-  protocol.outputs.technical_chord_sheet = technicalSheet();
-  protocol.outputs.playable_chord_sheet = playableSheet();
-  protocol.outputs.uncertainty_report = uncertaintyReport();
-  protocol.outputs.detection_report = detectReport();
+  protocol.outputs.technical_chord_sheet = protocol.outputs.technical_chord_sheet || `CIFRA TÉCNICA — ${protocol.music?.title || 'Sem título'}\nTom: ${protocol.music?.key || ''} | Compasso padrão: ${protocol.music?.meter_default || ''} | Andamento: ${protocol.music?.tempo || ''}\n\nSaída técnica depende de evidências aprovadas.`;
+  protocol.outputs.playable_chord_sheet = protocol.outputs.playable_chord_sheet || `${protocol.music?.title || 'Sem título'}\n\nCifra tocável bloqueada até liberação humana explícita.`;
+  protocol.outputs.uncertainty_report = protocol.outputs.uncertainty_report || 'RELATÓRIO DE INCERTEZAS\n\nSem saída recalculada nesta sessão.';
+  protocol.outputs.detection_report = protocol.outputs.detection_report || 'RELATÓRIO DE DETECÇÃO\n\nSem saída recalculada nesta sessão.';
   setText('technicalOutput', protocol.outputs.technical_chord_sheet);
   setText('playableOutput', protocol.outputs.playable_chord_sheet);
   setText('uncertaintyOutput', protocol.outputs.uncertainty_report);
   setText('detectionOutput', protocol.outputs.detection_report);
-  saveProtocolSafe();
 }
 
 function refreshAll() {
+  protocol = loadProtocol();
   renderMeasures();
   renderBlocks();
   renderReviews();
-  generateOutputsSafe();
+  generateOutputs();
 }
 
-function downloadSafe(filename, text, mime = 'text/plain;charset=utf-8') {
-  if (mods.downloadText) return mods.downloadText(filename, text, mime);
+function downloadText(filename, text, mime = 'text/plain;charset=utf-8') {
   const blob = new Blob([text], { type: mime });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -249,14 +193,12 @@ function downloadSafe(filename, text, mime = 'text/plain;charset=utf-8') {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
-function versionedSafe(base, ext) {
-  if (mods.versioned) return mods.versioned(base, ext);
+function versioned(base, ext) {
   const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 12);
   return `${base}_${stamp}.${ext}`;
 }
 
 async function clearCache() {
-  toast('Limpando cache do app...');
   localStorage.removeItem(STORAGE_KEY);
   sessionStorage.removeItem(STORAGE_KEY);
   protocol = emptyProtocol();
@@ -274,138 +216,86 @@ async function clearCache() {
 async function checkBackend() {
   const backendUrl = $('backendUrl')?.value?.trim() || 'http://localhost:8787';
   setText('backendStatus', 'Verificando backend...');
-  try {
-    if (mods.checkProfessionalOmrBackend) {
-      setText('backendStatus', JSON.stringify(await mods.checkProfessionalOmrBackend(backendUrl), null, 2));
-    } else {
-      const response = await fetch(`${backendUrl.replace(/\/$/, '')}/health`);
-      setText('backendStatus', JSON.stringify(await response.json(), null, 2));
-    }
-    toast('Backend verificado.');
-  } catch (error) {
-    setText('backendStatus', `Backend indisponível.\n${error.message || error}`);
-    logError(error, { category: 'backend', operation: 'health_check', backendUrl });
-    toast('Backend indisponível.');
-  }
+  const response = await fetch(`${backendUrl.replace(/\/$/, '')}/health`);
+  setText('backendStatus', JSON.stringify(await response.json(), null, 2));
 }
 
 async function processOmr() {
   const file = selectedFile || $('fileInput')?.files?.[0] || null;
-  const valid = validateSelectedFile(file);
-  if (!valid.ok) {
-    setText('fileInfo', valid.message);
-    logError(new Error(valid.message), { category: 'file' });
-    toast(valid.message);
-    return;
-  }
-  const btn = $('btnProfessionalOmr');
+  if (!file) { toast('Nenhum arquivo selecionado.'); return; }
+  const kind = fileKind(file);
+  if (!['pdf', 'image', 'musicxml'].includes(kind)) { toast('Tipo não aceito.'); return; }
   const backendUrl = $('backendUrl')?.value?.trim() || 'http://localhost:8787';
+  const btn = $('btnProfessionalOmr');
   if (btn) { btn.disabled = true; btn.textContent = 'Processando...'; }
   setText('processingStatus', 'Enviando arquivo ao backend OMR profissional...');
   try {
-    if (mods.analyzeWithProfessionalOmr) protocol = await mods.analyzeWithProfessionalOmr({ file, backendUrl });
-    else {
-      const form = new FormData(); form.append('file', file);
-      const response = await fetch(`${backendUrl.replace(/\/$/, '')}/api/omr/analyze`, { method: 'POST', body: form });
-      if (!response.ok) throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-      protocol = await response.json();
-    }
+    const form = new FormData();
+    form.append('file', file);
+    const response = await fetch(`${backendUrl.replace(/\/$/, '')}/api/omr/analyze`, { method: 'POST', body: form });
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+    protocol = sanitizeProtocol(await response.json());
     protocol.music ||= {};
     protocol.music.title ||= fileBaseName(file.name) || 'Sem título';
-    saveProtocolSafe();
-    setText('processingStatus', ['Processamento concluído.', `Arquivo: ${protocol.source?.file_name || file.name}`, `Status OMR: ${protocol.source?.omr_status || 'pending'}`, `Status OCR: ${protocol.source?.ocr_status || protocol.ocr?.status || 'pending'}`, `Blocos OCR: ${protocol.ocr?.text_blocks?.length || 0}`, `Compassos importados: ${protocol.measures?.length || 0}`].join('\n'));
+    saveProtocol(protocol);
+    setText('processingStatus', ['Processamento concluído.', `Arquivo: ${protocol.source?.file_name || file.name}`, `Status OMR: ${protocol.source?.omr_status || 'pending'}`, `Status OCR: ${protocol.source?.ocr_status || protocol.ocr?.status || 'pending'}`, `Compassos importados: ${protocol.measures?.length || 0}`].join('\n'));
     measureIndex = 0; ocrIndex = 0; reviewIndex = 0;
     refreshAll();
-    toast('Processamento profissional concluído.');
-  } catch (error) {
-    setText('processingStatus', `Erro no processamento profissional.\n${error.message || error}`);
-    logError(error, { category: 'backend', operation: 'analyze', backendUrl, file_name: file?.name || '' });
-    toast('Erro no OMR profissional.');
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Processar com OMR Profissional'; }
   }
 }
 
-function reviewMeasure(action) {
-  const measure = measures()[measureIndex];
-  if (!measure) return toast('Nenhum compasso carregado.');
-  if (action === 'accept') {
-    if (mods.acceptMeasure) mods.acceptMeasure(measure);
-    else { measure.review_status = 'approved'; measure.review_required = false; }
-  }
-  if (action === 'uncertain') {
-    if (mods.markMeasureUncertain) mods.markMeasureUncertain(measure);
-    else { measure.review_status = 'needs_fix'; measure.review_required = true; measure.confidence = 'incerto'; }
-  }
+function addReview(type, decision) {
+  const m = measures()[measureIndex];
+  if (!m) return;
   protocol.review ||= [];
-  protocol.review.push({ id: `measure-${action}-${Date.now()}`, audit: 'audit-50-ui', type: 'measure_review', target_id: measure.measure_id || measure.id || null, decision: action, reviewed_at: new Date().toISOString(), effects: { evidence_changed: false } });
-  saveProtocolSafe();
+  protocol.review.push({ id: `${type}-${Date.now()}`, audit: 'audit-59-shell', type, target_id: m.measure_id || m.id || null, decision, reviewed_at: new Date().toISOString(), effects: { evidence_changed: false } });
+  if (decision === 'accept') m.review_status = 'approved';
+  if (decision === 'uncertain') m.review_status = 'needs_fix';
+  saveProtocol(protocol);
   refreshAll();
-  toast(action === 'accept' ? 'Compasso aceito.' : 'Compasso marcado como incerto.');
 }
 
-function reviewBlock(type, decision, audit) {
-  const block = blocks()[ocrIndex];
-  if (!block) return toast('Nenhum bloco OCR carregado.');
-  protocol.review ||= [];
-  const review = { id: `${type}-${Date.now()}`, audit, type, target_id: block.fusion_id || null, decision, original_text: block.text || '', normalized_text: block.normalized_text || '', reviewed_at: new Date().toISOString(), effects: { evidence_changed: false, alignment_changed: false } };
-  protocol.review.push(review);
-  if (type === 'ocr_classification_review') block.human_review = { status: decision === 'approved' ? 'classification_approved' : 'classification_rejected', decision, review_id: review.id };
-  if (type === 'ocr_system_association_review') block.system_human_review = { status: decision === 'confirmed' ? 'system_state_confirmed' : 'system_state_rejected', decision, review_id: review.id };
-  if (type === 'ocr_measure_association_review') block.measure_human_review = { status: decision === 'confirmed' ? 'measure_state_confirmed' : 'measure_state_rejected', decision, review_id: review.id };
-  saveProtocolSafe();
-  refreshAll();
-  toast('Decisão humana registrada.');
-}
-
-async function loadModules() {
-  const results = await Promise.allSettled([
-    import('./modules/cpp-json.js'), import('./modules/file-input.js'), import('./modules/professional-omr-client.js'), import('./modules/feedback-engine.js'), import('./modules/measure-review.js'), import('./modules/chord-sheet-technical.js'), import('./modules/chord-sheet-playable.js'), import('./modules/confidence-engine.js'), import('./modules/export-output.js'), import('./modules/multipage-audit-export.js'), import('./modules/error-reporting.js'),
-  ]);
-  for (const result of results) {
-    if (result.status === 'fulfilled') Object.assign(mods, result.value);
-    else logError(result.reason, { category: 'module_import' });
-  }
-  loadProtocolSafe();
-}
-
-function hydrateButtons() {
+function bindButtons() {
   bindSafe('btnCheckBackend', checkBackend);
   bindSafe('btnClearFrontendCache', clearCache);
   bindSafe('btnProfessionalOmr', processOmr);
   bindSafe('btnPrevMeasure', () => { measureIndex = Math.max(0, measureIndex - 1); renderMeasures(); });
   bindSafe('btnNextMeasure', () => { measureIndex = Math.min(Math.max(measures().length - 1, 0), measureIndex + 1); renderMeasures(); });
-  bindSafe('btnAcceptMeasure', () => reviewMeasure('accept'));
-  bindSafe('btnMarkUncertain', () => reviewMeasure('uncertain'));
+  bindSafe('btnAcceptMeasure', () => addReview('measure_review', 'accept'));
+  bindSafe('btnMarkUncertain', () => addReview('measure_review', 'uncertain'));
   bindSafe('btnPrevOcrBlock', () => { ocrIndex = Math.max(0, ocrIndex - 1); renderBlocks(); });
   bindSafe('btnNextOcrBlock', () => { ocrIndex = Math.min(Math.max(blocks().length - 1, 0), ocrIndex + 1); renderBlocks(); });
-  bindSafe('btnApproveOcrClassification', () => reviewBlock('ocr_classification_review', 'approved', 'audit-36'));
-  bindSafe('btnRejectOcrClassification', () => reviewBlock('ocr_classification_review', 'rejected', 'audit-36'));
-  bindSafe('btnConfirmOcrSystemState', () => reviewBlock('ocr_system_association_review', 'confirmed', 'audit-37'));
-  bindSafe('btnRejectOcrSystemState', () => reviewBlock('ocr_system_association_review', 'rejected', 'audit-37'));
-  bindSafe('btnConfirmOcrMeasureState', () => reviewBlock('ocr_measure_association_review', 'confirmed', 'audit-38'));
-  bindSafe('btnRejectOcrMeasureState', () => reviewBlock('ocr_measure_association_review', 'rejected', 'audit-38'));
-  bindSafe('btnGenerateOutputs', () => { generateOutputsSafe(); toast('Saídas geradas.'); });
-  bindSafe('btnExportJson', () => downloadSafe(versionedSafe('protocolo_cpp', 'json'), mods.exportJson ? mods.exportJson(protocol) : JSON.stringify(protocol, null, 2), 'application/json;charset=utf-8'));
-  bindSafe('btnExportTech', () => downloadSafe(versionedSafe('cifra_tecnica', 'txt'), protocol.outputs?.technical_chord_sheet || technicalSheet()));
-  bindSafe('btnExportPlayable', () => downloadSafe(versionedSafe('cifra_tocavel', 'txt'), protocol.outputs?.playable_chord_sheet || playableSheet()));
-  bindSafe('btnExportUncertainty', () => downloadSafe(versionedSafe('relatorio_incertezas', 'txt'), protocol.outputs?.uncertainty_report || uncertaintyReport()));
-  bindSafe('btnExportDetection', () => downloadSafe(versionedSafe('relatorio_deteccao', 'txt'), protocol.outputs?.detection_report || detectReport()));
-  bindSafe('btnExportMultipageAudit', () => downloadSafe(versionedSafe('exportacao_multipagina_auditavel', 'json'), multipageReport(), 'application/json;charset=utf-8'));
-  bindSafe('btnExportAll', () => downloadSafe(versionedSafe('cpp_pacote_exportacao', 'json'), JSON.stringify({ protocol, outputs: protocol.outputs || {}, multipage_audit_export: JSON.parse(multipageReport()) }, null, 2), 'application/json;charset=utf-8'));
-  bindSafe('btnExportErrorLog', () => downloadSafe(versionedSafe('log_erros_operacionais', 'txt'), $('frontendErrorLog')?.textContent || 'Nenhum erro operacional registrado nesta sessão.'));
+  bindSafe('btnApproveOcrClassification', () => toast('Use revisão dedicada por JSON para esta etapa.'));
+  bindSafe('btnRejectOcrClassification', () => toast('Use revisão dedicada por JSON para esta etapa.'));
+  bindSafe('btnConfirmOcrSystemState', () => toast('Use revisão dedicada por JSON para esta etapa.'));
+  bindSafe('btnRejectOcrSystemState', () => toast('Use revisão dedicada por JSON para esta etapa.'));
+  bindSafe('btnConfirmOcrMeasureState', () => toast('Use revisão dedicada por JSON para esta etapa.'));
+  bindSafe('btnRejectOcrMeasureState', () => toast('Use revisão dedicada por JSON para esta etapa.'));
+  bindSafe('btnGenerateOutputs', () => { generateOutputs(); saveProtocol(protocol); });
+  bindSafe('btnExportJson', () => downloadText(versioned('protocolo_cpp', 'json'), JSON.stringify(protocol, null, 2), 'application/json;charset=utf-8'));
+  bindSafe('btnExportTech', () => downloadText(versioned('cifra_tecnica', 'txt'), $('technicalOutput')?.textContent || ''));
+  bindSafe('btnExportPlayable', () => downloadText(versioned('cifra_tocavel', 'txt'), $('playableOutput')?.textContent || ''));
+  bindSafe('btnExportUncertainty', () => downloadText(versioned('relatorio_incertezas', 'txt'), $('uncertaintyOutput')?.textContent || ''));
+  bindSafe('btnExportDetection', () => downloadText(versioned('relatorio_deteccao', 'txt'), $('detectionOutput')?.textContent || ''));
+  bindSafe('btnExportMultipageAudit', () => downloadText(versioned('exportacao_multipagina_auditavel', 'json'), JSON.stringify({ protocol }, null, 2), 'application/json;charset=utf-8'));
+  bindSafe('btnExportAll', () => downloadText(versioned('cpp_pacote_exportacao', 'json'), JSON.stringify({ protocol, outputs: protocol.outputs || {} }, null, 2), 'application/json;charset=utf-8'));
+  bindSafe('btnExportErrorLog', () => downloadText(versioned('log_erros_operacionais', 'txt'), $('frontendErrorLog')?.textContent || ''));
   bindSafe('btnClearErrorLog', () => setText('frontendErrorLog', 'Nenhum erro operacional registrado nesta sessão.'));
 }
 
-function hydrateFileInput() {
+function bindFileInput() {
   const input = $('fileInput');
   if (!input) return;
   input.onchange = event => {
     selectedFile = event.target.files?.[0] || null;
-    const valid = validateSelectedFile(selectedFile);
-    setText('fileInfo', selectedFile ? `${selectedFile.name} — ${valid.message}` : 'Nenhum arquivo selecionado.');
+    setText('fileInfo', selectedFile ? `${selectedFile.name} — Arquivo aceito para OMR profissional.` : 'Nenhum arquivo selecionado.');
     if (selectedFile) {
-      const title = $('musicTitle'); const key = $('musicKey'); const meter = $('meterDefault'); const tempo = $('tempo');
+      const title = $('musicTitle');
+      const key = $('musicKey');
+      const meter = $('meterDefault');
+      const tempo = $('tempo');
       if (title) title.value = fileBaseName(selectedFile.name);
       if (key) key.value = '';
       if (meter) meter.value = '';
@@ -414,22 +304,16 @@ function hydrateFileInput() {
   };
 }
 
-async function initAudit50() {
+function init() {
   setText('frontendBuild', `Frontend build: ${BUILD}`);
-  hydrateButtons();
-  hydrateFileInput();
+  bindButtons();
+  bindFileInput();
   const meter = $('meterDefault');
-  if (meter && !selectedFile) meter.value = '';
-  window.addEventListener('error', event => logError(event.error || event.message, { category: 'frontend_runtime', source: event.filename, line: event.lineno }));
-  window.addEventListener('unhandledrejection', event => logError(event.reason || 'Promise rejeitada sem tratamento', { category: 'frontend_promise' }));
-  await loadModules();
-  refreshAll();
   if (meter && !protocol?.source?.file_name) meter.value = '';
+  refreshAll();
   setText('processingStatus', 'Aguardando arquivo.');
+  window.addEventListener('error', event => logError(event.error || event.message, { category: 'frontend_runtime' }));
+  window.addEventListener('unhandledrejection', event => logError(event.reason || 'Promise rejeitada sem tratamento', { category: 'frontend_promise' }));
 }
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => initAudit50().catch(error => logError(error, { category: 'frontend_init' })));
-} else {
-  initAudit50().catch(error => logError(error, { category: 'frontend_init' }));
-}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
