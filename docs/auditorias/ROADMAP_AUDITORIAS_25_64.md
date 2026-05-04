@@ -7,16 +7,16 @@ Objetivo geral: evoluir o Conversor Profissional de Partituras de um núcleo OCR
 ## Estado consolidado atual
 
 ```txt
-Auditorias 25–62 — validadas/registradas
+Auditorias 25–63 — validadas/registradas
 Marcos 1–7 — fechados
 Marco 8 — iniciado
 Última validação confirmada: 18 passed
-Último commit validado: bcb5375 Record audit 62 hymn validation checklist
+Último commit validado: fd46022 Record audit 63 real repertoire validation
 Frontend build atual: audit-60-cache-v1
 Service worker cache atual: audit-60-cache-v1
 Branch: main
 origin/main: sincronizado
-Próxima auditoria: Auditoria 63 — Validação profissional com repertório real inicial
+Próxima auditoria: Auditoria 64 — Correções finais do cpp-pro
 ```
 
 ## Marcos fechados
@@ -26,7 +26,7 @@ Marco 1 — Núcleo OCR/Fusion textual profissional — Auditorias 25–29 — f
 Marco 2 — Núcleo geométrico MusicXML + OCR — Auditorias 30–34 — fechado
 Marco 3 — Núcleo de revisão humana auditável — Auditorias 35–39 — fechado
 Marco 4 — Núcleo de cifra técnica confiável — Auditorias 40–44 — fechado
-Marco 5 — Núcleo PDF/multipágina/cache/custo — Auditorias 45–49 — fechado
+Marco 5 — Núcleo PDF/multipágina/cache/custo — fechado
 Marco 6 — Núcleo operacional robusto — Auditorias 50–54 — fechado
 Marco 7 — Núcleo de validação musical assistida — Auditorias 55–59 — fechado
 ```
@@ -134,7 +134,7 @@ Auditoria 59 — Modo “pronto para cifra tocável” — validada
 Auditoria 60 — Pacote de exportação final — validada
 Auditoria 61 — Manual de uso local — registrada
 Auditoria 62 — Checklist de validação por louvor — registrada
-Auditoria 63 — Validação profissional com repertório real inicial
+Auditoria 63 — Validação profissional com repertório real inicial — registrada
 Auditoria 64 — Correções finais do cpp-pro
 ```
 
@@ -188,8 +188,8 @@ Auditorias 55–59 — fechado
 Auditoria 60 — validada
 Auditoria 61 — registrada
 Auditoria 62 — registrada
-Auditoria 63 — próxima
-Auditoria 64 — pendente
+Auditoria 63 — registrada
+Auditoria 64 — próxima
 ```
 
 ## Regra permanente de execução
