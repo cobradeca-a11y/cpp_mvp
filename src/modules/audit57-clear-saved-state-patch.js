@@ -92,9 +92,16 @@ function markBuild() {
   if (build) build.textContent = `Frontend build: ${AUDIT57_CLEAR_BUILD}`;
 }
 
+function loadAudit583Patch() {
+  setTimeout(() => {
+    import("./audit58-3-measure-bbox-derivation.js").catch(() => {});
+  }, 250);
+}
+
 function initAudit57ClearSavedStatePatch() {
   markBuild();
   bindClearButton();
+  loadAudit583Patch();
 }
 
 if (document.readyState === "loading") {
