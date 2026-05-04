@@ -7,15 +7,15 @@ Objetivo geral: evoluir o Conversor Profissional de Partituras de um núcleo OCR
 ## Estado consolidado atual
 
 ```txt
-Auditorias 25–50 — validadas e registradas
+Auditorias 25–51 — validadas e registradas
 Marcos 1–5 — fechados
 Marco 6 — iniciado
-Última validação confirmada: 18 passed
-Último commit validado: b6f8086 Record audit 50 v5 frontend error handling validation
-Frontend build atual: audit-50-cache-v5
+Última validação confirmada: 18 passed, 5 warnings in 1.03s
+Último commit validado: 3f9c441 Record audit 51 processing state validation
+Frontend build atual: audit-51-cache-v1
 Branch: main
 origin/main: sincronizado
-Próxima auditoria: Auditoria 51 — Fila/estado de processamento
+Próxima auditoria: Auditoria 52 — Cancelamento seguro de processamento preso
 ```
 
 ## Marcos fechados
@@ -104,7 +104,7 @@ Auditoria 49 — Exportação multipágina auditável — validada
 
 ```txt
 Auditoria 50 — Tratamento de erros profissional no frontend — validada
-Auditoria 51 — Fila/estado de processamento
+Auditoria 51 — Fila/estado de processamento — validada
 Auditoria 52 — Cancelamento seguro de processamento preso
 Auditoria 53 — Logs técnicos exportáveis
 Auditoria 54 — Modo diagnóstico completo
@@ -165,8 +165,8 @@ Auditorias 45–49 — fechado
 ### Marco 6 — Núcleo operacional robusto
 
 ```txt
-Auditoria 50 — validada
-Auditorias 51–54 — próximo
+Auditorias 50–51 — validadas
+Auditorias 52–54 — próximo
 ```
 
 ### Marco 7 — Núcleo de validação musical assistida
