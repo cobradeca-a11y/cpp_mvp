@@ -1,29 +1,16 @@
-const AUDIT66_BUILD = "audit-66-cache-v1";
+const AUDIT66_BUILD = "audit-66-cache-v2";
 const STORAGE_KEY = "cpp_professional_omr_protocol_v1";
 
 function byId(id) { return document.getElementById(id); }
 function asArray(value) { return Array.isArray(value) ? value : []; }
-function loadProtocol() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); }
-  catch { return {}; }
-}
+function loadProtocol() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); } catch { return {}; } }
 function saveProtocol(protocol) { localStorage.setItem(STORAGE_KEY, JSON.stringify(protocol || {})); }
-function esc(value) {
-  return String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
-}
 function now() { return new Date().toISOString(); }
 function measureId(measure, index) { return measure?.measure_id || measure?.id || `m${String(index).padStart(3, "0")}`; }
 function measureLabel(measure, index) { return `Compasso ${measure?.number ?? measure?.measure_number ?? index}`; }
 
-function valuesFrom(elements) {
-  return asArray(elements).map(item => item?.value || item?.text || "").filter(Boolean);
-}
-
-function approvedValues(measure, kind) {
-  const values = asArray(measure?.approved_evidence?.[kind]).map(item => item?.text || item?.value || "").filter(Boolean);
-  return [...new Set(values)];
-}
-
+function valuesFrom(elements) { return asArray(elements).map(item => item?.value || item?.text || "").filter(Boolean); }
+function approvedValues(measure, kind) { return [...new Set(asArray(measure?.approved_evidence?.[kind]).map(item => item?.text || item?.value || "").filter(Boolean))]; }
 function musicXmlValues(measure, kind) {
   const detected = measure?.detected_elements || {};
   if (kind === "chords") return valuesFrom(detected.chords);
@@ -33,19 +20,9 @@ function musicXmlValues(measure, kind) {
   if (kind === "navigation") return valuesFrom(detected.navigation);
   return [];
 }
-
-function ocrCandidateBlocks(protocol) {
-  return asArray(protocol?.fusion?.text_blocks_index).filter(block => block?.text || block?.normalized_text);
-}
-
-function isChord(block) {
-  return block?.classification === "possible_chord" || Boolean(block?.chord_analysis);
-}
-
-function isLyric(block) {
-  return ["possible_lyric", "lyric_syllable_fragment", "lyric_hyphen_or_continuation"].includes(block?.classification);
-}
-
+function ocrCandidateBlocks(protocol) { return asArray(protocol?.fusion?.text_blocks_index).filter(block => block?.text || block?.normalized_text); }
+function isChord(block) { return block?.classification === "possible_chord" || Boolean(block?.chord_analysis); }
+function isLyric(block) { return ["possible_lyric", "lyric_syllable_fragment", "lyric_hyphen_or_continuation"].includes(block?.classification); }
 function collectUnassignedOcr(protocol) {
   const blocks = ocrCandidateBlocks(protocol);
   return {
@@ -64,13 +41,9 @@ function measureSummary(measure, index) {
   const rests = musicXmlValues(measure, "rests");
   const navigation = musicXmlValues(measure, "navigation");
   const lacunae = asArray(measure?.lacunae);
-
   const chords = approvedChords.length ? approvedChords : xmlChords;
   const lyrics = approvedLyrics.length ? approvedLyrics : xmlLyrics;
-  const chordSource = approvedChords.length ? "human_review" : xmlChords.length ? "musicxml" : "none";
-  const lyricSource = approvedLyrics.length ? "human_review" : xmlLyrics.length ? "musicxml" : "none";
   const confidence = approvedChords.length || approvedLyrics.length ? "confirmed_by_human" : (xmlChords.length || xmlLyrics.length || notes.length || rests.length) ? "structured_musicxml" : "pending";
-
   return {
     measure_id: measureId(measure, index),
     label: measureLabel(measure, index),
@@ -82,8 +55,8 @@ function measureSummary(measure, index) {
     rests_count: rests.length,
     navigation,
     lacunae_count: lacunae.length,
-    chord_source: chordSource,
-    lyric_source: lyricSource,
+    chord_source: approvedChords.length ? "human_review" : xmlChords.length ? "musicxml" : "none",
+    lyric_source: approvedLyrics.length ? "human_review" : xmlLyrics.length ? "musicxml" : "none",
     confidence,
   };
 }
@@ -100,6 +73,7 @@ function buildAutomaticProduct(protocol = loadProtocol()) {
   const readableLines = [];
   readableLines.push("RELATÓRIO AUTOMÁTICO DE DETECÇÃO E PRODUTO MUSICAL");
   readableLines.push("");
+  readableLines.push(`Arquivo: ${protocol?.source?.file_name || ""}`);
   readableLines.push(`Motor OMR: ${protocol?.source?.omr_engine || "Audiveris/MusicXML"}`);
   readableLines.push(`Status OMR: ${protocol?.source?.omr_status || "pending"}`);
   readableLines.push(`Motor OCR: ${protocol?.source?.ocr_engine || protocol?.ocr?.engine || "não configurado"}`);
@@ -141,63 +115,31 @@ function buildAutomaticProduct(protocol = loadProtocol()) {
   }
   readableLines.push("");
   readableLines.push("Pendências automáticas:");
-  if (!unassigned.chords.length && !unassigned.lyrics.length && !blocked.length) {
-    readableLines.push("- Nenhuma pendência crítica registrada.");
-  } else {
+  if (!unassigned.chords.length && !unassigned.lyrics.length && !blocked.length) readableLines.push("- Nenhuma pendência crítica registrada.");
+  else {
     if (unassigned.chords.length) readableLines.push(`- Cifras OCR globais não associadas automaticamente: ${[...new Set(unassigned.chords)].slice(0, 40).join(", ")}`);
     if (unassigned.lyrics.length) readableLines.push(`- Textos/letras OCR globais não associados automaticamente: ${[...new Set(unassigned.lyrics)].slice(0, 60).join(" ")}`);
     if (blocked.length) readableLines.push(`- Compassos sem evidência estrutural suficiente: ${blocked.map(m => m.label).join(", ")}`);
   }
   readableLines.push("- Regra: revisão humana prevalece; OCR bruto permanece preservado; nada é inventado.");
 
-  const playableStatus = measures.every(m => m.confidence !== "pending") && (chordMeasures.length || lyricMeasures.length)
-    ? "automatic_structural_product_ready_for_review"
-    : "automatic_product_with_pending_evidence";
-
+  const playableStatus = measures.every(m => m.confidence !== "pending") && (chordMeasures.length || lyricMeasures.length) ? "automatic_structural_product_ready_for_review" : "automatic_product_with_pending_evidence";
   return {
     export_type: "cpp_automatic_musical_product",
-    audit: "audit-66",
+    audit: "audit-66.1",
     generated_at: now(),
     frontend: { build: AUDIT66_BUILD },
-    source: {
-      file_name: protocol?.source?.file_name || "",
-      file_type: protocol?.source?.file_type || "",
-      omr_status: protocol?.source?.omr_status || "pending",
-      ocr_status: protocol?.source?.ocr_status || protocol?.ocr?.status || "pending",
-    },
-    summary: {
-      measures_total: measures.length,
-      chord_measures: chordMeasures.length,
-      lyric_measures: lyricMeasures.length,
-      note_or_rest_measures: noteMeasures.length,
-      pending_measures: blocked.length,
-      unassigned_ocr_chords: unassigned.chords.length,
-      unassigned_ocr_lyrics: unassigned.lyrics.length,
-      playable_status: playableStatus,
-      automatic_process: true,
-      human_review_precedence: true,
-    },
+    source: { file_name: protocol?.source?.file_name || "", file_type: protocol?.source?.file_type || "", omr_status: protocol?.source?.omr_status || "pending", ocr_status: protocol?.source?.ocr_status || protocol?.ocr?.status || "pending" },
+    summary: { measures_total: measures.length, chord_measures: chordMeasures.length, lyric_measures: lyricMeasures.length, note_or_rest_measures: noteMeasures.length, pending_measures: blocked.length, unassigned_ocr_chords: unassigned.chords.length, unassigned_ocr_lyrics: unassigned.lyrics.length, playable_status: playableStatus, automatic_process: true, integrated_after_processing: true, human_review_precedence: true },
     music: protocol?.music || {},
     measures,
     unassigned_ocr_candidates: unassigned,
     readable_report: readableLines.join("\n"),
-    safety_contract: {
-      modifies_protocol: true,
-      modification_scope: "automatic_structural_product_generation_only",
-      modifies_ocr_raw_text: false,
-      preserves_ocr_raw_text: true,
-      infers_lyrics: false,
-      infers_harmony: false,
-      aligns_ocr_to_measure_without_geometry: false,
-      marks_playable_ready_automatically: false,
-      uses_musicxml_structural_evidence: true,
-      uses_human_review_when_available: true,
-      keeps_unassigned_ocr_as_pending: true,
-    },
+    safety_contract: { modifies_protocol: true, modification_scope: "automatic_structural_product_generation_only", modifies_ocr_raw_text: false, preserves_ocr_raw_text: true, infers_lyrics: false, infers_harmony: false, aligns_ocr_to_measure_without_geometry: false, marks_playable_ready_automatically: false, uses_musicxml_structural_evidence: true, uses_human_review_when_available: true, keeps_unassigned_ocr_as_pending: true },
   };
 }
 
-function applyAutomaticProduct() {
+function applyAutomaticProduct({ render = true } = {}) {
   const protocol = loadProtocol();
   const product = buildAutomaticProduct(protocol);
   protocol.outputs ||= {};
@@ -206,15 +148,15 @@ function applyAutomaticProduct() {
   protocol.automatic_product ||= {};
   protocol.automatic_product.audit_66 = product;
   saveProtocol(protocol);
+  if (render) renderProduct(product);
   return product;
 }
-
 function renderProduct(product) {
   const out = byId("audit66Output");
-  if (!out) return;
-  out.textContent = `${product.readable_report}\n\nJSON:\n${JSON.stringify(product, null, 2)}`;
+  if (out) out.textContent = product.readable_report;
+  const detection = byId("detectionOutput");
+  if (detection) detection.textContent = product.readable_report;
 }
-
 function createPanel() {
   if (byId("automaticMusicalProductAudit66")) return;
   const previous = byId("assistedMusicalReviewAudit65") || byId("finalExportPackageAudit60") || document.querySelector("main");
@@ -222,10 +164,9 @@ function createPanel() {
   const section = document.createElement("section");
   section.id = "automaticMusicalProductAudit66";
   section.className = "panel active";
-  section.innerHTML = `<h2>3P. Produto musical automático auditável</h2><p class="hint">Auditoria 66: gera automaticamente um relatório musical legível e uma guia estrutural usando MusicXML e revisões humanas. OCR não associado permanece como pendência, sem inferência.</p><div class="toolbar sticky"><button id="btnAudit66Generate" class="primary">Gerar produto automático</button><button id="btnAudit66Export" class="ok">Exportar produto JSON</button></div><pre id="audit66Output" class="output">Produto automático ainda não gerado.</pre>`;
+  section.innerHTML = `<h2>3P. Produto musical automático auditável</h2><p class="hint">Auditoria 66.1: gera automaticamente após o processamento e pode ser regenerado aqui. OCR não associado permanece como pendência.</p><div class="toolbar sticky"><button id="btnAudit66Generate" class="primary">Regenerar produto automático</button><button id="btnAudit66Export" class="ok">Exportar JSON auditável</button></div><pre id="audit66Output" class="output">Após processar a partitura, o produto automático aparece aqui.</pre>`;
   previous.insertAdjacentElement("afterend", section);
 }
-
 function downloadJson(name, data) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json;charset=utf-8" });
   const a = document.createElement("a");
@@ -234,30 +175,25 @@ function downloadJson(name, data) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
-
 function bindButtons() {
   const generate = byId("btnAudit66Generate");
-  if (generate) generate.onclick = event => { event.preventDefault(); renderProduct(applyAutomaticProduct()); };
+  if (generate) generate.onclick = event => { event.preventDefault(); applyAutomaticProduct(); };
   const exp = byId("btnAudit66Export");
-  if (exp) exp.onclick = event => {
-    event.preventDefault();
-    const product = applyAutomaticProduct();
-    renderProduct(product);
-    downloadJson(`cpp_produto_musical_automatico_audit66_${now().replace(/[-:T]/g, "").slice(0, 12)}.json`, product);
-  };
+  if (exp) exp.onclick = event => { event.preventDefault(); const product = applyAutomaticProduct(); downloadJson(`cpp_produto_musical_automatico_audit66_${now().replace(/[-:T]/g, "").slice(0, 12)}.json`, product); };
 }
-
 function markBuild() {
   window.CPP_ACTIVE_BUILD = AUDIT66_BUILD;
+  window.CPP_GENERATE_AUTOMATIC_MUSICAL_PRODUCT = applyAutomaticProduct;
   const build = byId("frontendBuild");
   if (build) build.textContent = `Frontend build: ${AUDIT66_BUILD}`;
 }
-
 function initAudit66AutomaticMusicalProduct() {
   markBuild();
   createPanel();
   bindButtons();
+  const existing = loadProtocol();
+  if (existing?.source?.file_name || asArray(existing?.measures).length) applyAutomaticProduct();
 }
-
+document.addEventListener("cpp:protocol-processed", () => applyAutomaticProduct());
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initAudit66AutomaticMusicalProduct);
 else initAudit66AutomaticMusicalProduct();
