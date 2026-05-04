@@ -26,38 +26,40 @@ def create_empty_ocr_contract(status: str = "pending", engine: str = "") -> dict
         "possible_chords": [],
         "possible_lyrics": [],
         "warnings": [],
+        "multipage_status": "not_processed",
+        "page_count": 0,
+        "pages": [],
     }
 
 
 def build_ocr_contract(source_path: str | Path | None = None, source_name: str = "", file_type: str = "") -> dict[str, Any]:
     """Return an explicit OCR evidence contract without faking OCR results.
 
-    Audit 46 adds OCR cache by image/page hash. Cached OCR is reused only when
-    the exact image/page content and OCR settings match. Cached blocks are not
-    modified except for the already explicit page normalization in PDF flow.
+    Audit 47 exposes explicit multipage OCR metadata derived from OCR page
+    evidence. It does not create musical page→system→measure association.
     """
     normalized_type = normalize_file_type(file_type or suffix_to_file_type(source_name))
 
     if normalized_type in OCR_NOT_APPLICABLE_FILE_TYPES:
         contract = create_empty_ocr_contract(status="not_applicable", engine="")
         contract["warnings"].append("OCR não aplicável para entrada MusicXML/MXL direta nesta etapa.")
-        return contract
+        return finalize_ocr_multipage_metadata(contract)
 
     if normalized_type not in OCR_SUPPORTED_FILE_TYPES:
         contract = create_empty_ocr_contract(status="not_applicable", engine="")
         contract["warnings"].append(f"OCR não aplicável para o tipo de arquivo: {normalized_type or 'desconhecido'}.")
-        return contract
+        return finalize_ocr_multipage_metadata(contract)
 
     ocr_engine = normalize_engine_name(configured_ocr_engine_cmd())
     if not ocr_engine:
         contract = create_empty_ocr_contract(status="unavailable", engine="")
         contract["warnings"].append("OCR_ENGINE não configurado. OCR real ainda não foi executado.")
-        return contract
+        return finalize_ocr_multipage_metadata(contract)
 
     if ocr_engine != GOOGLE_VISION_ENGINE:
         contract = create_empty_ocr_contract(status="unavailable", engine=ocr_engine)
         contract["warnings"].append(f"Motor OCR '{ocr_engine}' não suportado nesta auditoria.")
-        return contract
+        return finalize_ocr_multipage_metadata(contract)
 
     if normalized_type == "pdf":
         return run_google_vision_pdf_ocr(Path(source_path) if source_path else None)
@@ -67,18 +69,18 @@ def build_ocr_contract(source_path: str | Path | None = None, source_name: str =
 
     contract = create_empty_ocr_contract(status="unavailable", engine=GOOGLE_VISION_ENGINE)
     contract["warnings"].append(f"Tipo de arquivo não suportado pelo Google Vision nesta auditoria: {normalized_type}.")
-    return contract
+    return finalize_ocr_multipage_metadata(contract)
 
 
 def run_google_vision_image_ocr(source_path: Path | None) -> dict[str, Any]:
     credentials_error = validate_google_credentials()
     if credentials_error:
-        return credentials_error
+        return finalize_ocr_multipage_metadata(credentials_error)
 
     if source_path is None or not source_path.exists():
         contract = create_empty_ocr_contract(status="failed", engine=GOOGLE_VISION_ENGINE)
         contract["warnings"].append("Arquivo de entrada OCR não encontrado.")
-        return contract
+        return finalize_ocr_multipage_metadata(contract)
 
     feature = configured_ocr_feature()
     cache_key = cache_key_for_image(source_path, GOOGLE_VISION_ENGINE, feature)
@@ -87,14 +89,14 @@ def run_google_vision_image_ocr(source_path: Path | None) -> dict[str, Any]:
         contract = create_empty_ocr_contract(status="success", engine=GOOGLE_VISION_ENGINE)
         contract["text_blocks"] = normalize_ocr_pages(cached, default_page=1)
         contract["warnings"].append("OCR carregado do cache audit-46 por hash de imagem.")
-        return contract
+        return finalize_ocr_multipage_metadata(contract)
 
     try:
         text_blocks = _run_google_vision_image(source_path, feature)
     except ImportError:
         contract = create_empty_ocr_contract(status="unavailable", engine=GOOGLE_VISION_ENGINE)
         contract["warnings"].append("Dependência google-cloud-vision não instalada no ambiente.")
-        return contract
+        return finalize_ocr_multipage_metadata(contract)
     except Exception as exc:  # pragma: no cover - external API/runtime path
         contract = create_empty_ocr_contract(status="failed", engine=GOOGLE_VISION_ENGINE)
         contract["warnings"].append(
@@ -102,7 +104,7 @@ def run_google_vision_image_ocr(source_path: Path | None) -> dict[str, Any]:
             "`gcloud auth application-default login` para usar ADC local. Detalhe: "
             f"{exc}"
         )
-        return contract
+        return finalize_ocr_multipage_metadata(contract)
 
     text_blocks = normalize_ocr_pages(text_blocks, default_page=1)
     write_ocr_cache(cache_key, text_blocks, {"engine": GOOGLE_VISION_ENGINE, "feature": feature, "page": 1})
@@ -113,22 +115,23 @@ def run_google_vision_image_ocr(source_path: Path | None) -> dict[str, Any]:
         contract["warnings"].append("Google Vision executou, mas não retornou blocos de texto.")
     if not os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "").strip().strip('"'):
         contract["warnings"].append("Google Vision executado via Application Default Credentials local.")
-    return contract
+    return finalize_ocr_multipage_metadata(contract)
 
 
 def run_google_vision_pdf_ocr(source_path: Path | None) -> dict[str, Any]:
     credentials_error = validate_google_credentials()
     if credentials_error:
-        return credentials_error
+        return finalize_ocr_multipage_metadata(credentials_error)
 
     if source_path is None or not source_path.exists():
         contract = create_empty_ocr_contract(status="failed", engine=GOOGLE_VISION_ENGINE)
         contract["warnings"].append("Arquivo PDF de entrada OCR não encontrado.")
-        return contract
+        return finalize_ocr_multipage_metadata(contract)
 
     feature = configured_ocr_feature()
     cache_hits = 0
     cache_misses = 0
+    page_images: list[tuple[int, Path]] = []
 
     try:
         with tempfile.TemporaryDirectory(prefix="cpp_pdf_pages_") as tmp:
@@ -136,7 +139,7 @@ def run_google_vision_pdf_ocr(source_path: Path | None) -> dict[str, Any]:
             if not page_images:
                 contract = create_empty_ocr_contract(status="failed", engine=GOOGLE_VISION_ENGINE)
                 contract["warnings"].append("Conversão PDF→imagem não retornou páginas para OCR.")
-                return contract
+                return finalize_ocr_multipage_metadata(contract, expected_pages=[])
 
             all_blocks: list[dict[str, Any]] = []
             warnings: list[str] = []
@@ -159,11 +162,11 @@ def run_google_vision_pdf_ocr(source_path: Path | None) -> dict[str, Any]:
     except ImportError as exc:
         contract = create_empty_ocr_contract(status="unavailable", engine=GOOGLE_VISION_ENGINE)
         contract["warnings"].append(f"Dependência de conversão PDF→imagem indisponível: {exc}")
-        return contract
+        return finalize_ocr_multipage_metadata(contract)
     except Exception as exc:
         contract = create_empty_ocr_contract(status="failed", engine=GOOGLE_VISION_ENGINE)
         contract["warnings"].append(f"Falha ao converter PDF→imagem para OCR: {exc}")
-        return contract
+        return finalize_ocr_multipage_metadata(contract)
 
     contract = create_empty_ocr_contract(status="success" if all_blocks else "failed", engine=GOOGLE_VISION_ENGINE)
     contract["text_blocks"] = all_blocks
@@ -174,6 +177,34 @@ def run_google_vision_pdf_ocr(source_path: Path | None) -> dict[str, Any]:
         contract["warnings"].append("Google Vision executou nas páginas convertidas, mas não retornou blocos de texto.")
     if not os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "").strip().strip('"'):
         contract["warnings"].append("Google Vision executado via Application Default Credentials local.")
+    return finalize_ocr_multipage_metadata(contract, expected_pages=[page for page, _ in page_images])
+
+
+def finalize_ocr_multipage_metadata(contract: dict[str, Any], expected_pages: list[int] | None = None) -> dict[str, Any]:
+    text_blocks = contract.get("text_blocks") if isinstance(contract.get("text_blocks"), list) else []
+    pages_from_blocks = sorted({int(block.get("page") or 1) for block in text_blocks})
+    expected = sorted({int(page) for page in expected_pages or []})
+    page_numbers = sorted(set(expected) | set(pages_from_blocks))
+
+    pages = []
+    for page_number in page_numbers:
+        count = sum(1 for block in text_blocks if int(block.get("page") or 1) == page_number)
+        pages.append(
+            {
+                "page": page_number,
+                "ocr_status": "success" if count else "no_text_blocks",
+                "text_block_count": count,
+            }
+        )
+
+    contract["pages"] = pages
+    contract["page_count"] = len(page_numbers)
+    if len(page_numbers) > 1:
+        contract["multipage_status"] = "multipage_processed"
+    elif len(page_numbers) == 1:
+        contract["multipage_status"] = "single_page_processed"
+    else:
+        contract["multipage_status"] = "not_processed"
     return contract
 
 
@@ -281,11 +312,13 @@ def normalize_ocr_contract(ocr_contract: dict[str, Any] | None) -> dict[str, Any
     if not ocr_contract:
         return base
     merged = {**base, **ocr_contract}
-    for key in ["text_blocks", "possible_chords", "possible_lyrics", "warnings"]:
+    for key in ["text_blocks", "possible_chords", "possible_lyrics", "warnings", "pages"]:
         if not isinstance(merged.get(key), list):
             merged[key] = []
     merged["status"] = str(merged.get("status") or "pending")
     merged["engine"] = str(merged.get("engine") or "")
+    merged["multipage_status"] = str(merged.get("multipage_status") or "not_processed")
+    merged["page_count"] = int(merged.get("page_count") or 0)
     return merged
 
 
