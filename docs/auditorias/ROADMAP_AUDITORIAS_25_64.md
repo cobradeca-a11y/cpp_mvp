@@ -7,16 +7,15 @@ Objetivo geral: evoluir o Conversor Profissional de Partituras de um núcleo OCR
 ## Estado consolidado atual
 
 ```txt
-Auditorias 25–58.5 — validadas e registradas
-Marcos 1–6 — fechados
-Marco 7 — iniciado
+Auditorias 25–59 — validadas e registradas
+Marcos 1–7 — fechados
 Última validação confirmada: 18 passed
-Último commit validado: 3a467c4 Record audit 58.5 measure evidence validation
-Frontend build atual: audit-58-5-cache-v1
-Service worker cache atual: audit-58-5-cache-v1
+Último commit validado: 4ce150a Record audit 59 playable release validation
+Frontend build atual: audit-59-cache-v1
+Service worker cache atual: audit-59-cache-v1
 Branch: main
 origin/main: sincronizado
-Próxima auditoria: Auditoria 59 — Modo “pronto para cifra tocável”
+Próxima auditoria: Auditoria 60 — Pacote de exportação final
 ```
 
 ## Marcos fechados
@@ -28,6 +27,7 @@ Marco 3 — Núcleo de revisão humana auditável — Auditorias 35–39 — fec
 Marco 4 — Núcleo de cifra técnica confiável — Auditorias 40–44 — fechado
 Marco 5 — Núcleo PDF/multipágina/cache/custo — Auditorias 45–49 — fechado
 Marco 6 — Núcleo operacional robusto — Auditorias 50–54 — fechado
+Marco 7 — Núcleo de validação musical assistida — Auditorias 55–59 — fechado
 ```
 
 ## Estado confirmado antes deste roadmap
@@ -124,7 +124,7 @@ Auditoria 58.2 — Geometria explícita por compasso — validada
 Auditoria 58.3 — Detecção/derivação real de bbox por compasso — validada
 Auditoria 58.4 — Ajuste manual rápido de barras/compassos — validada
 Auditoria 58.5 — Revisão dedicada de cifras/letras/lacunas por compasso — validada
-Auditoria 59 — Modo “pronto para cifra tocável”
+Auditoria 59 — Modo “pronto para cifra tocável” — validada
 ```
 
 ## BLOCO H — Fechamento de consolidação profissional inicial
@@ -178,14 +178,13 @@ Auditorias 50–54 — fechado
 ### Marco 7 — Núcleo de validação musical assistida
 
 ```txt
-Auditorias 55–58.5 — validadas
-Auditoria 59 — próxima
+Auditorias 55–59 — fechado
 ```
 
 ### Marco 8 — Consolidação profissional com repertório real
 
 ```txt
-Auditorias 60–64
+Auditorias 60–64 — próximo
 ```
 
 ## Regra permanente de execução
