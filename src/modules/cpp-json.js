@@ -17,7 +17,7 @@ export function createInitialProtocol() {
     music: {
       title: "",
       key: "",
-      meter_default: "3/4",
+      meter_default: "",
       tempo: "",
       composer: "",
       arranger: ""
